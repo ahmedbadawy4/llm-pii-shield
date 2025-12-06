@@ -14,6 +14,7 @@ from .clients import ollama as ollama_client
 from .config import Settings, load_settings
 from .pii import redact_pii
 from . import storage
+from .schemas import ChatCompletionRequest
 
 
 def setup_logger(log_level: str) -> logging.Logger:
@@ -51,42 +52,43 @@ def create_app(settings: Settings | None = None) -> FastAPI:
             return RedirectResponse(url="/ui/")
 
     @app.post("/v1/chat/completions")
-    async def chat_completions(request: Request):
+    async def chat_completions(request: Request, body: ChatCompletionRequest):
         req_id = str(uuid.uuid4())
-        body = await request.json()
-
-        messages = body.get("messages", [])
-        if not isinstance(messages, list):
-            raise HTTPException(status_code=400, detail="messages must be a list")
+        payload = body.to_payload()
+        messages = body.messages
 
         original_len = 0
         masked_len = 0
         pii_types: Set[str] = set()
 
+        normalized_messages = []
         for msg in messages:
-            if not isinstance(msg, dict):
-                continue
+            msg_dict = msg.model_dump()
+            content = msg_dict.get("content")
+            role = msg_dict.get("role")
 
-            content = msg.get("content")
             if not isinstance(content, str):
+                normalized_messages.append(msg_dict)
                 continue
 
             original_len += len(content)
 
-            if msg.get("role") == "user":
+            should_mask = role == "user" or (settings.redact_assistant and role == "assistant")
+            if should_mask:
                 masked_content, detected = redact_pii(content)
                 masked_len += len(masked_content)
-                msg["content"] = masked_content
+                msg_dict["content"] = masked_content
                 pii_types.update(detected)
             else:
                 masked_len += len(content)
 
-        body["messages"] = messages
-        body.setdefault("stream", False)
+            normalized_messages.append(msg_dict)
+
+        payload["messages"] = normalized_messages
 
         start = time.time()
         try:
-            upstream_resp = await ollama_client.chat_completion(settings.ollama_base_url, body)
+            upstream_resp = await ollama_client.chat_completion(settings.ollama_base_url, payload)
         except Exception as exc:
             raise HTTPException(status_code=502, detail=f"Ollama unreachable: {exc}") from exc
         duration = time.time() - start
@@ -119,7 +121,7 @@ def create_app(settings: Settings | None = None) -> FastAPI:
             "id": req_id,
             "timestamp": timestamp,
             "pii_types": pii_list,
-            "model": body.get("model"),
+            "model": payload.get("model"),
             "latency": duration,
             "original_length": original_len,
             "masked_length": masked_len,

@@ -9,7 +9,7 @@ Prerequisites
 - Docker (for containerized runs)
 - Ollama running locally
 - Environment variable `OLLAMA_BASE_URL` pointing at your Ollama instance (defaults to `http://host.docker.internal:11434`)
-- Optional: `DATABASE_PATH` (defaults to `./data/audit.db`) and `LOG_LEVEL` (defaults to `INFO`)
+- Optional: `DATABASE_PATH` (defaults to `./data/audit.db`), `LOG_LEVEL` (defaults to `INFO`), `REDACT_ASSISTANT` (default `false`)
 
 Install Ollama locally
 ----------------------
@@ -42,8 +42,9 @@ If your Ollama instance is on a different host/port, change `OLLAMA_BASE_URL` ac
 API contract
 ------------
 - Endpoint: `POST /v1/chat/completions`
-- Request fields supported: `model` (string), `messages` (OpenAI-style role/content list), optional `stream` (default is forced to `False` only when omitted), and any extra fields are forwarded untouched to Ollama.
+- Request validated with Pydantic: `model` (string), `messages` (list of `{role, content}`), optional `stream` (default forced to `False` when omitted), and any extra fields are forwarded untouched to Ollama.
 - Redaction scope: only `user` messages are redacted. `system`/`assistant` messages are proxied as-is.
+- Optional: set `REDACT_ASSISTANT=true` to also redact assistant messages before logging/persistence.
 - PII types masked: email, phone numbers, IBAN, credit card numbers, SSN-like patterns, simple street addresses (number + street name). Placeholders such as `[REDACTED_EMAIL]` replace matches.
 - Unsupported: OpenAI tool/function calling metadata is passed through unchanged; if Ollama does not support a field it will respond with an error. Prompts are **not** logged—only metadata is.
 
@@ -83,7 +84,8 @@ Admin stats endpoint
   - `total_requests`
   - `pii_counts` (per type)
   - `recent_events` (up to `limit`, with request id/timestamp/model/latency/lengths/pii_types)
-- Designed for internal dashboards or debugging; avoid exposing publicly without auth.
+- `limit` is clamped between 1 and 100.
+- **Security:** Designed for internal dashboards or debugging. Do not expose `/admin/stats` publicly without authentication or network restrictions, even though it only returns metadata.
 
 Simple UI
 ---------
@@ -119,3 +121,14 @@ Project layout
 - `src/main.py`: uvicorn entrypoint (imports `app`)
 - `tests/`: pytest suite
 - `Dockerfile`: container build for the API
+
+Scope and positioning
+---------------------
+- Regex-based, best-effort PII shielding; not a guarantee of full PII removal. For strict compliance, combine with additional safeguards and review.
+- Geared toward homelab/early-stage use; avoid exposing admin endpoints publicly without auth/network controls.
+
+Future issues to track
+----------------------
+- Add basic API key auth for `/admin/stats`.
+- Expand false-positive coverage for credit cards/addresses.
+- Iterate UI at `/ui` for better usability.
