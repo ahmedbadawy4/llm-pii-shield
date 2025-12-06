@@ -2,7 +2,9 @@ import json
 import sqlite3
 from collections import Counter
 from pathlib import Path
-from typing import Any, Dict, List
+from typing import Any
+from typing import Dict
+from typing import List
 
 
 def init_db(path: Path) -> None:
@@ -47,7 +49,9 @@ def record_request(path: Path, payload: Dict[str, Any]) -> None:
 def fetch_stats(path: Path, limit: int = 20) -> Dict[str, Any]:
     with sqlite3.connect(path) as conn:
         conn.row_factory = sqlite3.Row
-        total_requests = conn.execute("SELECT COUNT(*) as count FROM requests").fetchone()["count"]
+        total_requests = conn.execute(
+            "SELECT COUNT(*) as count FROM requests"
+        ).fetchone()["count"]
         pii_rows = conn.execute("SELECT pii_types FROM requests").fetchall()
 
         pii_counter: Counter[str] = Counter()

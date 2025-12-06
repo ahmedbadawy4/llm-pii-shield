@@ -25,7 +25,9 @@ def load_settings() -> Settings:
     db_path.parent.mkdir(parents=True, exist_ok=True)
 
     return Settings(
-        ollama_base_url=os.getenv("OLLAMA_BASE_URL", "http://host.docker.internal:11434"),
+        ollama_base_url=os.getenv(
+            "OLLAMA_BASE_URL", "http://host.docker.internal:11434"
+        ),
         database_path=db_path,
         log_level=os.getenv("LOG_LEVEL", "INFO"),
         redact_assistant=_str_to_bool(os.getenv("REDACT_ASSISTANT"), False),

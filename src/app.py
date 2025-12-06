@@ -2,18 +2,23 @@ import json
 import logging
 import time
 import uuid
-from datetime import datetime, timezone
+from datetime import datetime
+from datetime import timezone
 from pathlib import Path
 from typing import Set
 
-from fastapi import FastAPI, HTTPException, Request
-from fastapi.responses import JSONResponse, RedirectResponse
+from fastapi import FastAPI
+from fastapi import HTTPException
+from fastapi import Request
+from fastapi.responses import JSONResponse
+from fastapi.responses import RedirectResponse
 from fastapi.staticfiles import StaticFiles
 
-from .clients import ollama as ollama_client
-from .config import Settings, load_settings
-from .pii import redact_pii
 from . import storage
+from .clients import ollama as ollama_client
+from .config import Settings
+from .config import load_settings
+from .pii import redact_pii
 from .schemas import ChatCompletionRequest
 
 
@@ -73,7 +78,9 @@ def create_app(settings: Settings | None = None) -> FastAPI:
 
             original_len += len(content)
 
-            should_mask = role == "user" or (settings.redact_assistant and role == "assistant")
+            should_mask = role == "user" or (
+                settings.redact_assistant and role == "assistant"
+            )
             if should_mask:
                 masked_content, detected = redact_pii(content)
                 masked_len += len(masked_content)
@@ -88,9 +95,13 @@ def create_app(settings: Settings | None = None) -> FastAPI:
 
         start = time.time()
         try:
-            upstream_resp = await ollama_client.chat_completion(settings.ollama_base_url, payload)
+            upstream_resp = await ollama_client.chat_completion(
+                settings.ollama_base_url, payload
+            )
         except Exception as exc:
-            raise HTTPException(status_code=502, detail=f"Ollama unreachable: {exc}") from exc
+            raise HTTPException(
+                status_code=502, detail=f"Ollama unreachable: {exc}"
+            ) from exc
         duration = time.time() - start
 
         if upstream_resp.status_code != 200:

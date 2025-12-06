@@ -1,17 +1,25 @@
+import importlib
 import json
-from typing import Dict, Tuple
+from typing import Dict
+from typing import Tuple
 
 import pytest
 from fastapi.testclient import TestClient
 
-from src import config, app as app_module
+from src import config
+
+app_module = importlib.import_module("src.app")
 
 
 class DummyResponse:
     status_code = 200
 
     def json(self):
-        return {"model": "dummy", "message": {"role": "assistant", "content": "ok"}, "done": True}
+        return {
+            "model": "dummy",
+            "message": {"role": "assistant", "content": "ok"},
+            "done": True,
+        }
 
     @property
     def text(self):
@@ -26,7 +34,9 @@ def client_with_stub(monkeypatch, tmp_path) -> Tuple[TestClient, Dict]:
         captured["payload"] = payload
         return DummyResponse()
 
-    monkeypatch.setattr(app_module.ollama_client, "chat_completion", fake_chat_completion)
+    monkeypatch.setattr(
+        app_module.ollama_client, "chat_completion", fake_chat_completion
+    )
     monkeypatch.setenv("DATABASE_PATH", str(tmp_path / "audit.db"))
     monkeypatch.setenv("OLLAMA_BASE_URL", "http://ollama.invalid")
     monkeypatch.setenv("LOG_LEVEL", "INFO")
@@ -78,20 +88,32 @@ def test_does_not_over_redact_invalid_email(client_with_stub):
     client, captured = client_with_stub
     body = {
         "model": "llama3.1:8b",
-        "messages": [{"role": "user", "content": "This looks like an email not@valid but is not."}],
+        "messages": [
+            {
+                "role": "user",
+                "content": "This looks like an email not@valid but is not.",
+            }
+        ],
     }
     resp = client.post("/v1/chat/completions", json=body)
 
     assert resp.status_code == 200
     assert resp.headers["X-PII-Redacted"] == "none"
-    assert captured["payload"]["messages"][0]["content"] == body["messages"][0]["content"]
+    assert (
+        captured["payload"]["messages"][0]["content"] == body["messages"][0]["content"]
+    )
 
 
 def test_admin_stats_counts_requests(client_with_stub):
     client, _ = client_with_stub
     body = {
         "model": "llama3.1:8b",
-        "messages": [{"role": "user", "content": "Email me at jane@example.com and call 555-123-4567"}],
+        "messages": [
+            {
+                "role": "user",
+                "content": "Email me at jane@example.com and call 555-123-4567",
+            }
+        ],
     }
     post_resp = client.post("/v1/chat/completions", json=body)
     assert post_resp.status_code == 200

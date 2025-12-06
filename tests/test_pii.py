@@ -6,7 +6,11 @@ from src.pii import redact_pii
 @pytest.mark.parametrize(
     "text, expected_mask, expected_types",
     [
-        ("Contact me at jane.doe@example.com", "Contact me at [REDACTED_EMAIL]", ["email"]),
+        (
+            "Contact me at jane.doe@example.com",
+            "Contact me at [REDACTED_EMAIL]",
+            ["email"],
+        ),
         ("Call me at +1 (555) 123-4567", "Call me at [REDACTED_PHONE]", ["phone"]),
         ("IBAN DE89370400440532013000", "IBAN [REDACTED_IBAN]", ["iban"]),
         ("Card 4111-1111-1111-1111", "Card [REDACTED_CARD]", ["credit_card"]),

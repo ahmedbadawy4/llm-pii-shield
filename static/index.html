@@ -3,11 +3,11 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>PII Shield UI</title>
+  <title>PII Shield Console</title>
   <style>
     :root {
       --bg: #0f172a;
-      --panel: #111827;
+      --panel: #0b1220;
       --accent: #22c55e;
       --muted: #94a3b8;
       --text: #e2e8f0;
@@ -16,7 +16,7 @@
     body {
       margin: 0;
       font-family: "Inter", -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
-      background: radial-gradient(circle at 20% 20%, #1f2937, #0b1224 45%), var(--bg);
+      background: radial-gradient(circle at 18% 20%, #1f2937, #0b1224 45%), var(--bg);
       color: var(--text);
       min-height: 100vh;
       display: flex;
@@ -24,15 +24,11 @@
       padding: 24px;
     }
     .container {
-      width: min(1100px, 100%);
+      width: min(1180px, 100%);
       display: grid;
       gap: 16px;
     }
-    h1 {
-      margin: 0;
-      font-size: 28px;
-      letter-spacing: -0.02em;
-    }
+    h1 { margin: 0; font-size: 28px; letter-spacing: -0.02em; }
     .panel {
       background: var(--panel);
       border: 1px solid #1f2937;
@@ -40,15 +36,10 @@
       padding: 16px;
       box-shadow: 0 10px 30px rgba(0, 0, 0, 0.25);
     }
-    label {
-      display: block;
-      font-size: 13px;
-      color: var(--muted);
-      margin-bottom: 6px;
-    }
+    label { display: block; font-size: 13px; color: var(--muted); margin-bottom: 6px; }
     input[type="text"], textarea {
       width: 100%;
-      background: #0b1220;
+      background: #0f172a;
       border: 1px solid #1f2937;
       color: var(--text);
       border-radius: 10px;
@@ -57,13 +48,13 @@
       box-sizing: border-box;
     }
     textarea { min-height: 140px; resize: vertical; }
-    .row { display: grid; gap: 12px; grid-template-columns: 1fr 1fr; }
+    .row { display: grid; gap: 12px; grid-template-columns: repeat(auto-fit, minmax(260px, 1fr)); }
     .actions {
       display: flex;
       gap: 10px;
       align-items: center;
       flex-wrap: wrap;
-      margin-top: 8px;
+      margin-top: 10px;
     }
     button {
       background: var(--accent);
@@ -80,7 +71,7 @@
     button:hover { transform: translateY(-1px); }
     .small { font-size: 13px; color: var(--muted); }
     pre {
-      background: #0b1220;
+      background: #0f172a;
       border: 1px solid #1f2937;
       border-radius: 10px;
       padding: 12px;
@@ -89,10 +80,7 @@
       font-size: 13px;
       line-height: 1.35;
     }
-    .status {
-      font-size: 13px;
-      margin-top: 6px;
-    }
+    .status { font-size: 13px; margin-top: 6px; }
     .status.error { color: var(--danger); }
     .tag {
       display: inline-flex;
@@ -100,13 +88,13 @@
       gap: 6px;
       padding: 6px 10px;
       border-radius: 999px;
-      background: #0b1220;
+      background: #0f172a;
       border: 1px solid #1f2937;
       font-size: 12px;
       color: var(--muted);
     }
     .flex { display: flex; align-items: center; gap: 8px; }
-    .grid-2 { display: grid; grid-template-columns: repeat(auto-fit, minmax(260px, 1fr)); gap: 10px; }
+    .grid-3 { display: grid; grid-template-columns: repeat(auto-fit, minmax(280px, 1fr)); gap: 10px; }
   </style>
 </head>
 <body>
@@ -115,11 +103,11 @@
       <div class="flex" style="justify-content: space-between; flex-wrap: wrap;">
         <div>
           <h1>PII Shield Console</h1>
-          <div class="small">Submit prompts through the redaction proxy and view audit stats.</div>
+          <div class="small">Send prompts through the proxy, see redactions, and watch stats move.</div>
         </div>
         <div class="tag">
           <span>API base</span>
-          <input id="baseUrl" type="text" value="http://127.0.0.1:8000" style="width: 180px; padding: 6px 8px; border-radius: 8px; border: 1px solid #1f2937; background: #0f172a; color: var(--text); font-size: 12px;">
+          <input id="baseUrl" type="text" value="http://127.0.0.1:8000" style="width: 190px; padding: 6px 8px; border-radius: 8px; border: 1px solid #1f2937; background: #0f172a; color: var(--text); font-size: 12px;">
         </div>
       </div>
     </div>
@@ -137,30 +125,31 @@
       </div>
       <div style="margin-top: 12px;">
         <label for="prompt">User message</label>
-        <textarea id="prompt" placeholder="Enter a prompt that may include PII..."></textarea>
+        <textarea id="prompt" placeholder="Enter a prompt that may include PII...">Email me at jane.doe@example.com and call (555) 123-4567.</textarea>
       </div>
       <div class="actions">
-        <button id="sendBtn">Send to /v1/chat/completions</button>
+        <button id="sendBtn">Send</button>
+        <button class="secondary" id="showStats">Show stats</button>
         <label class="flex small" style="gap: 6px; cursor: pointer;">
-          <input id="showMasked" type="checkbox" checked>
-          Show payload sent to API
+          <input id="showPayload" type="checkbox" checked>
+          Show payload sent
         </label>
         <span class="status" id="status"></span>
       </div>
     </div>
 
-    <div class="panel grid-2">
+    <div class="panel grid-3">
       <div>
-        <div class="flex" style="justify-content: space-between; margin-bottom: 8px;">
-          <div class="small">Response JSON</div>
-        </div>
+        <div class="small" style="margin-bottom: 6px;">Response JSON</div>
         <pre id="responseBox">Waiting for request...</pre>
       </div>
       <div>
-        <div class="flex" style="justify-content: space-between; margin-bottom: 8px;">
-          <div class="small">Headers + Sent Payload</div>
-        </div>
-        <pre id="metaBox">Waiting for request...</pre>
+        <div class="small" style="margin-bottom: 6px;">Headers (PII signals)</div>
+        <pre id="headersBox">Waiting for request...</pre>
+      </div>
+      <div>
+        <div class="small" style="margin-bottom: 6px;">Payload sent</div>
+        <pre id="payloadBox">Waiting for request...</pre>
       </div>
     </div>
 
@@ -178,14 +167,15 @@
 
     const statusEl = $("status");
     const responseBox = $("responseBox");
-    const metaBox = $("metaBox");
+    const headersBox = $("headersBox");
+    const payloadBox = $("payloadBox");
     const statsBox = $("statsBox");
 
     async function sendRequest() {
       const base = $("baseUrl").value.trim().replace(/\/$/, "");
       const model = $("model").value.trim();
       const system = $("system").value.trim();
-      const prompt = $("prompt").value;
+      const prompt = $("prompt").value.trim();
       if (!base) return setStatus("Base URL required", true);
       if (!model) return setStatus("Model is required", true);
       if (!prompt) return setStatus("User message is required", true);
@@ -194,11 +184,12 @@
       if (system) messages.push({ role: "system", content: system });
       messages.push({ role: "user", content: prompt });
 
-      const payload = { model, messages, stream: false };
+      const payload = { model, messages };
 
       setStatus("Sending...", false);
-      metaBox.textContent = "Waiting for response...";
       responseBox.textContent = "Waiting for response...";
+      headersBox.textContent = "Waiting for response...";
+      payloadBox.textContent = "Waiting for response...";
 
       try {
         const res = await fetch(`${base}/v1/chat/completions`, {
@@ -209,25 +200,30 @@
 
         const text = await res.text();
         const json = safeParse(text);
-
         responseBox.textContent = json ? JSON.stringify(json, null, 2) : text;
 
         const headers = {};
         res.headers.forEach((v, k) => headers[k] = v);
-
-        const showPayload = $("showMasked").checked;
-        metaBox.textContent = JSON.stringify({
+        headersBox.textContent = JSON.stringify({
           status: res.status,
-          headers,
-          sent_payload: showPayload ? payload : "hidden"
+          "X-PII-Redacted": headers["x-pii-redacted"],
+          "X-Original-Length": headers["x-original-length"],
+          "X-Masked-Length": headers["x-masked-length"],
+          "X-Request-ID": headers["x-request-id"],
+          "X-Latency-Seconds": headers["x-latency-seconds"],
+          all: headers
         }, null, 2);
 
+        const showPayload = $("showPayload").checked;
+        payloadBox.textContent = showPayload ? JSON.stringify(payload, null, 2) : "hidden";
+
         setStatus(res.ok ? "Success" : "Upstream error", !res.ok);
-        fetchStats(); // refresh stats after request
+        fetchStats();
       } catch (err) {
         setStatus(`Error: ${err}`, true);
-        metaBox.textContent = "Request failed.";
-        responseBox.textContent = "";
+        responseBox.textContent = "Request failed.";
+        headersBox.textContent = "Request failed.";
+        payloadBox.textContent = "";
       }
     }
 
@@ -256,6 +252,7 @@
 
     $("sendBtn").addEventListener("click", sendRequest);
     $("refreshStats").addEventListener("click", fetchStats);
+    $("showStats").addEventListener("click", fetchStats);
   </script>
 </body>
 </html>
