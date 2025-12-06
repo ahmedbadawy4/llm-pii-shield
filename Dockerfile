@@ -8,7 +8,9 @@ RUN pip install --no-cache-dir -r requirements.txt
 COPY src ./src
 COPY tests ./tests
 COPY README.md .
-COPY .gitignore .dockerignore ./
+COPY static ./static
+
+ENV PYTHONPATH=/app/src
 
 EXPOSE 8000
 

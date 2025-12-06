@@ -1,7 +1,7 @@
 LLM Privacy/PII Shield
 ======================
 
-FastAPI service that redacts common PII (email, phone, IBAN) from user prompts before proxying them to an Ollama model.
+FastAPI service that redacts PII from user prompts before proxying them to an Ollama model, with audit-friendly metadata logging and a lightweight stats endpoint.
 
 Prerequisites
 -------------
@@ -9,6 +9,7 @@ Prerequisites
 - Docker (for containerized runs)
 - Ollama running locally
 - Environment variable `OLLAMA_BASE_URL` pointing at your Ollama instance (defaults to `http://host.docker.internal:11434`)
+- Optional: `DATABASE_PATH` (defaults to `./data/audit.db`) and `LOG_LEVEL` (defaults to `INFO`)
 
 Install Ollama locally
 ----------------------
@@ -38,6 +39,14 @@ docker run --rm \
 ```
 If your Ollama instance is on a different host/port, change `OLLAMA_BASE_URL` accordingly.
 
+API contract
+------------
+- Endpoint: `POST /v1/chat/completions`
+- Request fields supported: `model` (string), `messages` (OpenAI-style role/content list), optional `stream` (default is forced to `False` only when omitted), and any extra fields are forwarded untouched to Ollama.
+- Redaction scope: only `user` messages are redacted. `system`/`assistant` messages are proxied as-is.
+- PII types masked: email, phone numbers, IBAN, credit card numbers, SSN-like patterns, simple street addresses (number + street name). Placeholders such as `[REDACTED_EMAIL]` replace matches.
+- Unsupported: OpenAI tool/function calling metadata is passed through unchanged; if Ollama does not support a field it will respond with an error. Prompts are **not** logged—only metadata is.
+
 Example request and expected response
 -------------------------------------
 ```bash
@@ -62,6 +71,25 @@ x-latency-seconds: 2.598
 ```
 Note: user PII is masked before forwarding, so the `messages` sent to Ollama contain placeholders (e.g., `[REDACTED_IBAN]`).
 
+Structured logging and audit storage
+------------------------------------
+- Each request writes a JSON log line with: `event`, `id`, `timestamp`, `pii_types`, `model`, `latency`, `original_length`, `masked_length`, `client_ip`.
+- Prompts/responses are **not** logged in this mode—only metadata.
+- Metadata is also persisted to a local SQLite database at `DATABASE_PATH` for basic auditing and reporting.
+
+Admin stats endpoint
+--------------------
+- `GET /admin/stats?limit=20` returns:
+  - `total_requests`
+  - `pii_counts` (per type)
+  - `recent_events` (up to `limit`, with request id/timestamp/model/latency/lengths/pii_types)
+- Designed for internal dashboards or debugging; avoid exposing publicly without auth.
+
+Simple UI
+---------
+- A lightweight HTML console is available at `/ui` (served by the same FastAPI app) to send prompts, view responses/headers, and fetch `/admin/stats`.
+- Static assets live in `static/index.html` and are copied into the Docker image.
+
 Running tests
 -------------
 - Local: install deps (prefer Python 3.12), then run:
@@ -83,6 +111,11 @@ Running tests
 
 Project layout
 --------------
-- `src/`: application code (`src/main.py`)
+- `src/app.py`: FastAPI app and routes
+- `src/pii.py`: regex definitions and masking helpers
+- `src/config.py`: environment-driven settings
+- `src/clients/ollama.py`: minimal Ollama HTTP client
+- `src/storage.py`: SQLite audit persistence helpers
+- `src/main.py`: uvicorn entrypoint (imports `app`)
 - `tests/`: pytest suite
 - `Dockerfile`: container build for the API
