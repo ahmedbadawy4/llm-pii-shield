@@ -6,17 +6,17 @@
   <title>PII Shield Console</title>
   <style>
     :root {
-      --bg: #0f172a;
-      --panel: #0b1220;
-      --accent: #22c55e;
-      --muted: #94a3b8;
-      --text: #e2e8f0;
-      --danger: #f87171;
+      --bg: #f7f8fb;
+      --panel: #ffffff;
+      --accent: #10a37f;
+      --muted: #6b7280;
+      --text: #111827;
+      --danger: #e11d48;
     }
     body {
       margin: 0;
       font-family: "Inter", -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
-      background: radial-gradient(circle at 18% 20%, #1f2937, #0b1224 45%), var(--bg);
+      background: var(--bg);
       color: var(--text);
       min-height: 100vh;
       display: flex;
@@ -31,16 +31,17 @@
     h1 { margin: 0; font-size: 28px; letter-spacing: -0.02em; }
     .panel {
       background: var(--panel);
-      border: 1px solid #1f2937;
-      border-radius: 14px;
+      border: 1px solid #e5e7eb;
+      border-radius: 16px;
       padding: 16px;
-      box-shadow: 0 10px 30px rgba(0, 0, 0, 0.25);
+      box-shadow: 0 10px 30px rgba(15, 23, 42, 0.06);
+      animation: fadeIn 240ms ease;
     }
     label { display: block; font-size: 13px; color: var(--muted); margin-bottom: 6px; }
     input[type="text"], textarea {
       width: 100%;
-      background: #0f172a;
-      border: 1px solid #1f2937;
+      background: #f8fafc;
+      border: 1px solid #e5e7eb;
       color: var(--text);
       border-radius: 10px;
       padding: 10px 12px;
@@ -65,14 +66,14 @@
       font-weight: 600;
       cursor: pointer;
       transition: transform 120ms ease, box-shadow 120ms ease;
-      box-shadow: 0 6px 18px rgba(34, 197, 94, 0.35);
+      box-shadow: 0 8px 20px rgba(16, 163, 127, 0.28);
     }
-    button.secondary { background: #1f2937; color: var(--text); box-shadow: none; }
-    button:hover { transform: translateY(-1px); }
+    button.secondary { background: #eef2ff; color: #111827; box-shadow: none; border: 1px solid #e5e7eb; }
+    button:hover { transform: translateY(-2px); }
     .small { font-size: 13px; color: var(--muted); }
     pre {
-      background: #0f172a;
-      border: 1px solid #1f2937;
+      background: #f8fafc;
+      border: 1px solid #e5e7eb;
       border-radius: 10px;
       padding: 12px;
       overflow-x: auto;
@@ -88,13 +89,17 @@
       gap: 6px;
       padding: 6px 10px;
       border-radius: 999px;
-      background: #0f172a;
-      border: 1px solid #1f2937;
+      background: #f8fafc;
+      border: 1px solid #e5e7eb;
       font-size: 12px;
       color: var(--muted);
     }
     .flex { display: flex; align-items: center; gap: 8px; }
     .grid-3 { display: grid; grid-template-columns: repeat(auto-fit, minmax(280px, 1fr)); gap: 10px; }
+    @keyframes fadeIn {
+      from { opacity: 0; translate: 0 6px; }
+      to { opacity: 1; translate: 0 0; }
+    }
   </style>
 </head>
 <body>
@@ -103,16 +108,28 @@
       <div class="flex" style="justify-content: space-between; flex-wrap: wrap;">
         <div>
           <h1>PII Shield Console</h1>
-          <div class="small">Send prompts through the proxy, see redactions, and watch stats move.</div>
+          <div class="small">Send prompts through the proxy and see what was redacted.</div>
         </div>
         <div class="tag">
           <span>API base</span>
-          <input id="baseUrl" type="text" value="http://127.0.0.1:8000" style="width: 190px; padding: 6px 8px; border-radius: 8px; border: 1px solid #1f2937; background: #0f172a; color: var(--text); font-size: 12px;">
+          <input id="baseUrl" type="text" value="" style="width: 190px; padding: 6px 8px; border-radius: 8px; border: 1px solid #e5e7eb; background: #f8fafc; color: var(--text); font-size: 12px;">
         </div>
+      </div>
+      <div class="actions" style="margin-top: 10px;">
+        <button class="secondary" id="tabChat">Chat</button>
+        <button class="secondary" id="tabStats">Stats</button>
+        <span class="status" id="status"></span>
       </div>
     </div>
 
-    <div class="panel">
+    <div class="panel" id="chatPanel">
+      <div>
+        <div class="small" style="margin-bottom: 6px;">History</div>
+        <div id="history" style="max-height: 240px; overflow-y: auto; border: 1px solid #e5e7eb; border-radius: 10px; padding: 10px; background: #fff;">
+          <div class="small" style="color: var(--muted);">No messages yet.</div>
+        </div>
+      </div>
+      <hr style="border: none; border-top: 1px solid #e5e7eb; margin: 16px 0;">
       <div class="row">
         <div>
           <label for="model">Model</label>
@@ -125,35 +142,43 @@
       </div>
       <div style="margin-top: 12px;">
         <label for="prompt">User message</label>
-        <textarea id="prompt" placeholder="Enter a prompt that may include PII...">Email me at jane.doe@example.com and call (555) 123-4567.</textarea>
+        <textarea id="prompt" placeholder="Enter a prompt that may include PII..."></textarea>
       </div>
       <div class="actions">
         <button id="sendBtn">Send</button>
-        <button class="secondary" id="showStats">Show stats</button>
         <label class="flex small" style="gap: 6px; cursor: pointer;">
           <input id="showPayload" type="checkbox" checked>
           Show payload sent
         </label>
-        <span class="status" id="status"></span>
       </div>
     </div>
 
-    <div class="panel grid-3">
+    <div class="panel grid-3" id="resultsPanel">
       <div>
-        <div class="small" style="margin-bottom: 6px;">Response JSON</div>
-        <pre id="responseBox">Waiting for request...</pre>
+        <div class="small" style="margin-bottom: 6px;">Assistant reply</div>
+        <div id="responseText" class="small" style="min-height: 120px;">Waiting for request...</div>
+        <details style="margin-top: 8px;">
+          <summary class="small">Raw JSON</summary>
+          <pre id="responseBox">Waiting for request...</pre>
+        </details>
       </div>
       <div>
-        <div class="small" style="margin-bottom: 6px;">Headers (PII signals)</div>
+        <div class="flex" style="justify-content: space-between; margin-bottom: 6px;">
+          <div class="small">Headers (PII signals)</div>
+          <button class="secondary" id="toggleHeaders" style="padding: 4px 8px; font-size: 12px;">Hide</button>
+        </div>
         <pre id="headersBox">Waiting for request...</pre>
       </div>
       <div>
-        <div class="small" style="margin-bottom: 6px;">Payload sent</div>
+        <div class="flex" style="justify-content: space-between; margin-bottom: 6px;">
+          <div class="small">Payload sent</div>
+          <button class="secondary" id="togglePayload" style="padding: 4px 8px; font-size: 12px;">Hide</button>
+        </div>
         <pre id="payloadBox">Waiting for request...</pre>
       </div>
     </div>
 
-    <div class="panel">
+    <div class="panel" id="statsPanel" style="display: none;">
       <div class="flex" style="justify-content: space-between;">
         <div class="small">Audit stats (/admin/stats)</div>
         <button class="secondary" id="refreshStats">Refresh</button>
@@ -170,6 +195,24 @@
     const headersBox = $("headersBox");
     const payloadBox = $("payloadBox");
     const statsBox = $("statsBox");
+    const responseText = $("responseText");
+    const history = $("history");
+    const chatPanel = $("chatPanel");
+    const statsPanel = $("statsPanel");
+    const resultsPanel = $("resultsPanel");
+
+    // Default API base to current origin to avoid hard-coded localhost mismatches behind ingress.
+    (() => {
+      const input = $("baseUrl");
+      if (input && !input.value) {
+        try {
+          const origin = window.location.origin;
+          input.value = origin;
+        } catch {
+          input.value = "http://127.0.0.1:8000";
+        }
+      }
+  })();
 
     async function sendRequest() {
       const base = $("baseUrl").value.trim().replace(/\/$/, "");
@@ -190,6 +233,7 @@
       responseBox.textContent = "Waiting for response...";
       headersBox.textContent = "Waiting for response...";
       payloadBox.textContent = "Waiting for response...";
+      responseText.textContent = "Waiting for response...";
 
       try {
         const res = await fetch(`${base}/v1/chat/completions`, {
@@ -201,6 +245,8 @@
         const text = await res.text();
         const json = safeParse(text);
         responseBox.textContent = json ? JSON.stringify(json, null, 2) : text;
+        responseText.textContent = extractAssistantReply(json) || text;
+        appendHistory(prompt, responseText.textContent);
 
         const headers = {};
         res.headers.forEach((v, k) => headers[k] = v);
@@ -231,6 +277,51 @@
       try { return JSON.parse(text); } catch { return null; }
     }
 
+    function appendHistory(userMsg, assistantMsg) {
+      if (!history) return;
+      const wrapper = document.createElement("div");
+      wrapper.style.marginBottom = "12px";
+
+      const userBubble = document.createElement("div");
+      userBubble.textContent = userMsg;
+      userBubble.style.background = "#f8fafc";
+      userBubble.style.border = "1px solid #e5e7eb";
+      userBubble.style.borderRadius = "12px";
+      userBubble.style.padding = "8px 10px";
+      userBubble.style.marginBottom = "6px";
+      userBubble.style.color = "#111827";
+
+      const assistantBubble = document.createElement("div");
+      assistantBubble.textContent = assistantMsg || "(no reply)";
+      assistantBubble.style.background = "#ecfdf3";
+      assistantBubble.style.border = "1px solid #d1fae5";
+      assistantBubble.style.borderRadius = "12px";
+      assistantBubble.style.padding = "8px 10px";
+      assistantBubble.style.color = "#065f46";
+
+      wrapper.appendChild(userBubble);
+      wrapper.appendChild(assistantBubble);
+      history.appendChild(wrapper);
+
+      const emptyText = history.querySelector(".empty");
+      if (emptyText) emptyText.remove();
+
+      history.scrollTop = history.scrollHeight;
+    }
+
+    function extractAssistantReply(json) {
+      if (!json || typeof json !== "object") return null;
+      if (json.message && typeof json.message.content === "string") return json.message.content;
+      if (Array.isArray(json.messages)) {
+        const last = json.messages.find((m) => m.role === "assistant");
+        if (last && typeof last.content === "string") return last.content;
+      }
+      if (Array.isArray(json.choices) && json.choices[0]?.message?.content) {
+        return json.choices[0].message.content;
+      }
+      return null;
+    }
+
     function setStatus(msg, isError) {
       statusEl.textContent = msg;
       statusEl.className = "status" + (isError ? " error" : "");
@@ -252,7 +343,27 @@
 
     $("sendBtn").addEventListener("click", sendRequest);
     $("refreshStats").addEventListener("click", fetchStats);
-    $("showStats").addEventListener("click", fetchStats);
+    $("toggleHeaders").addEventListener("click", () => {
+      const hidden = headersBox.style.display === "none";
+      headersBox.style.display = hidden ? "block" : "none";
+      $("toggleHeaders").textContent = hidden ? "Hide" : "Show";
+    });
+    $("togglePayload").addEventListener("click", () => {
+      const hidden = payloadBox.style.display === "none";
+      payloadBox.style.display = hidden ? "block" : "none";
+      $("togglePayload").textContent = hidden ? "Hide" : "Show";
+    });
+    $("tabStats").addEventListener("click", () => {
+      chatPanel.style.display = "none";
+      resultsPanel.style.display = "none";
+      statsPanel.style.display = "block";
+      fetchStats();
+    });
+    $("tabChat").addEventListener("click", () => {
+      chatPanel.style.display = "block";
+      resultsPanel.style.display = "grid";
+      statsPanel.style.display = "none";
+    });
   </script>
 </body>
 </html>

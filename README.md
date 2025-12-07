@@ -39,6 +39,47 @@ docker run --rm \
 ```
 If your Ollama instance is on a different host/port, change `OLLAMA_BASE_URL` accordingly.
 
+Kubernetes (Helm, local)
+------------------------
+Prereqs: Helm 3, local cluster (kind/minikube/microk8s), container image accessible to the cluster. Chart lives in `deploy/helm/pii-shield`.
+
+Basic install (no ingress):
+```bash
+cd deploy/helm
+helm upgrade --install pii-shield ./pii-shield \
+  --set "image.repository=devopsahmed/mizan-llm" \
+  --set image.tag=latest \
+  --set namespace=pii-shield
+```
+
+Enable ingress (host `mizan-pii-shield.local`):
+```bash
+helm upgrade --install pii-shield ./pii-shield \
+  --set "image.repository=devopsahmed/mizan-llm" \
+  --set namespace=pii-shield \
+  --set "ingress.className=<your-ingress-class>"
+```
+
+Note: ingress is enabled by default in `values.yaml` with host `mizan-pii-shield.local` and path `/`. Set `ingress.className` to match your controller (leave empty to use the cluster default). If you override hosts via `--set ingress.hosts[0].host=...`, also set the paths alongside it (e.g., `--set ingress.hosts[0].paths[0].path=/ --set ingress.hosts[0].paths[0].pathType=Prefix`). Add a hosts entry if needed (e.g., `127.0.0.1 mizan-pii-shield.local` for kind/nginx). Override the host/class to match your setup.
+
+Persistence: enabled by default via PVC mounted at `/app/data` (SQLite audit DB). Override `persistence.*` in `values.yaml` or set `persistence.existingClaim` to reuse a PVC.
+
+Prometheus: `/metrics` is exposed; enable ServiceMonitor via `--set serviceMonitor.enabled=true` if Prometheus Operator is installed.
+
+Ollama in-cluster (optional)
+----------------------------
+You can run Ollama inside the cluster and point the gateway at it:
+```bash
+helm upgrade --install pii-shield ./pii-shield \
+  --set "image.repository=devopsahmed/mizan-llm" \
+  --set "ollama.enabled=true" \
+  --set "ollama.image.repository=ollama/ollama" \
+  --set "ollama.image.tag=latest"
+```
+By default this deploys an Ollama pod + PVC and rewires `OLLAMA_BASE_URL` to the in-cluster service. Adjust resources/nodeSelector/PVC settings under `ollama.*` in `values.yaml`. Note: kind does not support GPU; for GPU you need a cluster with GPU-enabled nodes.
+
+To pre-pull models on startup, set `ollama.prePullModels` (e.g., `--set ollama.prePullModels[0]=llama3.1:8b`); the Ollama pod will pull them via a postStart hook.
+
 API contract
 ------------
 - Endpoint: `POST /v1/chat/completions`

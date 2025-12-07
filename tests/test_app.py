@@ -78,6 +78,20 @@ def test_chat_completion_forces_stream_false_when_missing(client_with_stub):
     assert captured["payload"]["stream"] is False
 
 
+def test_metrics_exposed(client_with_stub):
+    client, _ = client_with_stub
+    body = {
+        "model": "llama3.1:8b",
+        "messages": [{"role": "user", "content": "Email me at a@b.com"}],
+    }
+    client.post("/v1/chat/completions", json=body)
+
+    metrics_resp = client.get("/metrics")
+    assert metrics_resp.status_code == 200
+    assert "pii_shield_chat_requests_total" in metrics_resp.text
+    assert "pii_shield_chat_latency_seconds" in metrics_resp.text
+
+
 def test_upstream_error_is_propagated(monkeypatch, tmp_path):
     async def failing_chat_completion(base_url, payload):
         return httpx.Response(

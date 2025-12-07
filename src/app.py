@@ -10,9 +10,14 @@ from typing import Set
 from fastapi import FastAPI
 from fastapi import HTTPException
 from fastapi import Request
+from fastapi.staticfiles import StaticFiles
 from fastapi.responses import JSONResponse
 from fastapi.responses import RedirectResponse
-from fastapi.staticfiles import StaticFiles
+from fastapi.responses import Response
+from prometheus_client import CONTENT_TYPE_LATEST
+from prometheus_client import Counter
+from prometheus_client import Histogram
+from prometheus_client import generate_latest
 
 from . import storage
 from .clients import ollama as ollama_client
@@ -20,6 +25,16 @@ from .config import Settings
 from .config import load_settings
 from .pii import redact_pii
 from .schemas import ChatCompletionRequest
+
+CHAT_REQUEST_COUNT = Counter(
+    "pii_shield_chat_requests_total",
+    "Count of chat completion requests processed",
+    ["status"],
+)
+CHAT_LATENCY = Histogram(
+    "pii_shield_chat_latency_seconds",
+    "Latency for chat completion requests in seconds",
+)
 
 
 def setup_logger(log_level: str) -> logging.Logger:
@@ -47,6 +62,10 @@ def create_app(settings: Settings | None = None) -> FastAPI:
     @app.get("/healthz")
     async def healthz():
         return {"status": "ok"}
+
+    @app.get("/metrics", include_in_schema=False)
+    async def metrics():
+        return Response(generate_latest(), media_type=CONTENT_TYPE_LATEST)
 
     static_dir = Path(__file__).resolve().parent.parent / "static"
     if static_dir.exists():
@@ -99,12 +118,14 @@ def create_app(settings: Settings | None = None) -> FastAPI:
                 settings.ollama_base_url, payload
             )
         except Exception as exc:
+            CHAT_REQUEST_COUNT.labels(status="error").inc()
             raise HTTPException(
                 status_code=502, detail=f"Ollama unreachable: {exc}"
             ) from exc
         duration = time.time() - start
 
         if upstream_resp.status_code != 200:
+            CHAT_REQUEST_COUNT.labels(status="error").inc()
             raise HTTPException(
                 status_code=upstream_resp.status_code,
                 detail=upstream_resp.text,
@@ -113,10 +134,14 @@ def create_app(settings: Settings | None = None) -> FastAPI:
         try:
             upstream_json = upstream_resp.json()
         except ValueError as exc:
+            CHAT_REQUEST_COUNT.labels(status="error").inc()
             raise HTTPException(
                 status_code=502,
                 detail=f"Ollama returned invalid JSON: {exc}",
             ) from exc
+
+        CHAT_LATENCY.observe(duration)
+        CHAT_REQUEST_COUNT.labels(status="success").inc()
 
         pii_list = sorted(pii_types)
         response = JSONResponse(content=upstream_json)

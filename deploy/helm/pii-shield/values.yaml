@@ -1,0 +1,85 @@
+image:
+  repository: devopsahmed/mizan-llm
+  tag: latest
+  pullPolicy: Always
+
+namespace: pii-shield
+
+service:
+  type: ClusterIP
+  port: 8000
+
+ingress:
+  enabled: true
+  className: "nginx"
+  annotations:
+    kubernetes.io/ingress.class: "nginx"
+  # When overriding hosts via --set, include paths as well to avoid an empty http.paths list.
+  hosts:
+    - host: mizan-pii-shield.local
+      paths:
+        - path: /
+          pathType: Prefix
+  tls: []
+
+resources:
+  requests:
+    cpu: 250m
+    memory: 512Mi
+  limits:
+    cpu: 500m
+    memory: 1Gi
+podAnnotations: {}
+
+nodeSelector: {}
+tolerations: []
+affinity: {}
+
+persistence:
+  enabled: true
+  size: 1Gi
+  accessModes:
+    - ReadWriteOnce
+  storageClass: ""
+  existingClaim: ""
+  mountPath: /app/data
+
+env:
+  ollamaBaseUrl: "http://host.docker.internal:11434"
+  logLevel: "INFO"
+  redactAssistant: "false"
+  databasePath: "/app/data/audit.db"
+
+ollama:
+  enabled: true
+  image:
+    repository: ollama/ollama
+    tag: latest
+    pullPolicy: IfNotPresent
+  servicePort: 11434
+  prePullModels: 
+    - llama3.1:8b 
+  persistence:
+    enabled: true
+    size: 7Gi
+    storageClass: ""
+    existingClaim: ""
+    mountPath: /root/.ollama
+  resources:
+    requests:
+      cpu: "1"
+      memory: 4Gi
+    limits:
+      cpu: "2"
+      memory: 8Gi
+  podAnnotations: {}
+  nodeSelector: {}
+  tolerations: []
+  affinity: {}
+
+serviceMonitor:
+  enabled: false
+  interval: 30s
+  scrapeTimeout: 10s
+  namespace: ""
+  additionalLabels: {}
