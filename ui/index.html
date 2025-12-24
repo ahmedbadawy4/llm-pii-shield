@@ -1,0 +1,122 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>PII Shield UI</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link
+      href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,500;9..144,700&family=Space+Grotesk:wght@400;600&display=swap"
+      rel="stylesheet"
+    />
+    <link rel="stylesheet" href="styles.css" />
+  </head>
+  <body>
+    <main class="page">
+      <header class="hero">
+        <div>
+          <p class="eyebrow">PII Shield Gateway</p>
+          <h1>Redact before you send.</h1>
+          <p class="subhead">
+            Proxy prompts through the gateway to mask PII and keep audit-safe
+            metadata.
+          </p>
+        </div>
+        <div class="status-card" id="statusCard">
+          <p class="status-title">API status</p>
+          <p class="status-value" id="apiStatus">Not checked</p>
+          <button class="ghost" id="checkHealth">Check health</button>
+        </div>
+      </header>
+
+      <section class="panel">
+        <details class="details" open>
+          <summary>Connection settings</summary>
+          <p class="hint">Set the base URL and admin key for stats.</p>
+          <div class="grid">
+            <label class="field">
+              <span>API base URL</span>
+              <input id="apiBase" type="url" value="" />
+            </label>
+            <label class="field">
+              <span>Admin key (X-Admin-Key)</span>
+              <input id="adminKey" type="text" placeholder="optional" />
+            </label>
+          </div>
+        </details>
+      </section>
+
+      <section class="panel">
+        <div class="panel-header">
+          <h2>Send a prompt</h2>
+          <p>User messages are redacted before forwarding.</p>
+        </div>
+        <div class="grid">
+          <label class="field">
+            <span>Model</span>
+            <input id="model" type="text" value="llama3.1:8b" />
+          </label>
+          <label class="field">
+            <span>System (optional)</span>
+            <input id="system" type="text" placeholder="You are a helpful assistant." />
+          </label>
+        </div>
+        <label class="field">
+          <span>User message</span>
+          <textarea id="prompt" placeholder="Enter a prompt that may include PII..."></textarea>
+        </label>
+        <div class="actions">
+          <label class="toggle">
+            <input id="showPayload" type="checkbox" checked />
+            <span>Show payload sent</span>
+          </label>
+          <button id="sendBtn">Send request</button>
+        </div>
+        <p class="hint status" id="status">Ready.</p>
+      </section>
+
+      <section class="panel">
+        <div class="panel-header">
+          <h2>Response details</h2>
+          <p>Inspect the assistant reply, raw payload, and redaction headers.</p>
+        </div>
+        <div class="output">
+          <div>
+            <p class="output-title">Assistant reply</p>
+            <div id="responseText" class="response-bubble">Waiting for request...</div>
+          </div>
+          <div>
+            <p class="output-title">Headers (PII signals)</p>
+            <pre id="headersBox">Waiting for request...</pre>
+          </div>
+        </div>
+        <details class="details">
+          <summary>Raw JSON</summary>
+          <pre id="responseBox">Waiting for request...</pre>
+        </details>
+        <details class="details">
+          <summary>Payload sent</summary>
+          <pre id="payloadBox">Waiting for request...</pre>
+        </details>
+      </section>
+
+      <section class="panel">
+        <div class="panel-header">
+          <h2>Admin stats</h2>
+          <p>Requires the admin key header when enabled.</p>
+        </div>
+        <details class="details">
+          <summary>Show admin stats</summary>
+          <div class="actions">
+            <button class="ghost" id="refreshStats">Refresh stats</button>
+          </div>
+          <pre id="statsBox">Press refresh to load.</pre>
+        </details>
+      </section>
+    </main>
+
+    <script src="config.js"></script>
+    <script src="app.js"></script>
+  </body>
+</html>

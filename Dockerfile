@@ -9,6 +9,7 @@ COPY src ./src
 COPY tests ./tests
 COPY README.md .
 COPY static ./static
+COPY ui ./ui
 
 ENV PYTHONPATH=/app/src
 

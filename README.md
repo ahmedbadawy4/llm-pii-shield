@@ -110,16 +110,23 @@ helm upgrade --install pii-shield ./pii-shield \
   --set image.tag=latest \
   --set namespace=pii-shield
 ```
+For local clusters (Docker Desktop), `make helm-install` builds the image locally and uses it via `image.pullPolicy=IfNotPresent`.
 
-Enable ingress (host `mizan-pii-shield.local`):
+Local NodePort (no ingress required):
+```bash
+make helm-urls
+```
+
+Enable ingress (optional, requires an ingress controller):
 ```bash
 helm upgrade --install pii-shield ./pii-shield \
   --set "image.repository=devopsahmed/mizan-llm" \
   --set namespace=pii-shield \
+  --set ingress.enabled=true \
   --set "ingress.className=<your-ingress-class>"
 ```
 
-Note: ingress is enabled by default in `values.yaml` with host `mizan-pii-shield.local` and path `/`. Set `ingress.className` to match your controller (leave empty to use the cluster default). If you override hosts via `--set ingress.hosts[0].host=...`, also set the paths alongside it (e.g., `--set ingress.hosts[0].paths[0].path=/ --set ingress.hosts[0].paths[0].pathType=Prefix`). Add a hosts entry if needed (e.g., `127.0.0.1 mizan-pii-shield.local` for kind/nginx). Override the host/class to match your setup.
+Note: ingress is disabled by default in `values.yaml`. If you enable it, set `ingress.className` to match your controller (leave empty to use the cluster default). If you override hosts via `--set ingress.hosts[0].host=...`, also set the paths alongside it (e.g., `--set ingress.hosts[0].paths[0].path=/ --set ingress.hosts[0].paths[0].pathType=Prefix`). Add a hosts entry if needed (e.g., `127.0.0.1 mizan-pii-shield.local` for kind/nginx). Override the host/class to match your setup. If NodePort is not reachable, fall back to `make helm-port-forward`.
 
 Persistence: enabled by default via PVC mounted at `/app/data` (SQLite audit DB). Override `persistence.*` in `values.yaml` or set `persistence.existingClaim` to reuse a PVC.
 
@@ -197,9 +204,12 @@ Threat model (short)
 
 Simple UI
 ---------
-- A lightweight HTML console is available at `/ui` (served by the same FastAPI app) to send prompts, view responses/headers, and fetch `/admin/stats`.
+- A lightweight HTML console is available via the standalone UI service at `/` when `ui.enabled=true` in Helm.
 - Enter `ADMIN_API_KEY` in the UI to authorize stats fetches (sent as `X-Admin-Key`).
-- Static assets live in `static/index.html` and are copied into the Docker image.
+- UI assets live in `ui/` and are copied into the Docker image.
+- Helm can deploy the UI as a standalone pod/service with `ui.enabled=true`; set `ui.apiBaseUrl` if the API is exposed elsewhere (defaults to `http://localhost:30080` for local NodePort).
+- Standalone UI calls the API from a different origin; CORS is enabled for local `localhost`/`127.0.0.1` ports used by the UI.
+- The API does not serve `/ui` by default; set `SERVE_UI=true` only if you want the API to host the UI locally.
 
 ![UI screenshot](docs/images/ui-screenshot.png)
 

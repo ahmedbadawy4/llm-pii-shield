@@ -1,0 +1,18 @@
+{{- if .Values.ui.enabled }}
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: {{ include "pii-shield.fullname" . }}-ui
+  namespace: {{ .Values.namespace | default .Release.Namespace }}
+  labels:
+    app.kubernetes.io/name: {{ include "pii-shield.name" . }}
+    app.kubernetes.io/instance: {{ .Release.Name }}
+    app.kubernetes.io/component: ui
+data:
+  config.js: |
+    window.RUNTIME_CONFIG = {
+      API_BASE_URL: "{{ .Values.ui.apiBaseUrl }}",
+      DEFAULT_MODEL: "{{ .Values.ui.defaultModel }}",
+      ADMIN_KEY: ""
+    };
+{{- end }}
