@@ -35,11 +35,12 @@ def client_with_stub(monkeypatch, tmp_path) -> Tuple[TestClient, Dict]:
         return DummyResponse()
 
     monkeypatch.setattr(
-        app_module.ollama_client, "chat_completion", fake_chat_completion
+        app_module.adapters.ollama_client, "chat_completion", fake_chat_completion
     )
     monkeypatch.setenv("DATABASE_PATH", str(tmp_path / "audit.db"))
     monkeypatch.setenv("OLLAMA_BASE_URL", "http://ollama.invalid")
     monkeypatch.setenv("LOG_LEVEL", "INFO")
+    monkeypatch.setenv("ADMIN_API_KEY", "test-key")
 
     settings = config.load_settings()
     app = app_module.create_app(settings)
@@ -118,7 +119,7 @@ def test_admin_stats_counts_requests(client_with_stub):
     post_resp = client.post("/v1/chat/completions", json=body)
     assert post_resp.status_code == 200
 
-    stats_resp = client.get("/admin/stats")
+    stats_resp = client.get("/admin/stats", headers={"X-Admin-Key": "test-key"})
     assert stats_resp.status_code == 200
 
     payload = stats_resp.json()

@@ -1,0 +1,47 @@
+{
+  "uid": "pii-shield",
+  "title": "PII Shield",
+  "timezone": "browser",
+  "schemaVersion": 38,
+  "version": 1,
+  "time": {
+    "from": "now-6h",
+    "to": "now"
+  },
+  "panels": [
+    {
+      "type": "timeseries",
+      "title": "Chat request rate",
+      "datasource": "Prometheus",
+      "targets": [
+        {
+          "expr": "sum(rate(pii_shield_chat_requests_total[5m]))",
+          "legendFormat": "requests/sec"
+        }
+      ],
+      "gridPos": {
+        "h": 8,
+        "w": 12,
+        "x": 0,
+        "y": 0
+      }
+    },
+    {
+      "type": "timeseries",
+      "title": "Chat latency p95",
+      "datasource": "Prometheus",
+      "targets": [
+        {
+          "expr": "histogram_quantile(0.95, sum(rate(pii_shield_chat_latency_seconds_bucket[5m])) by (le))",
+          "legendFormat": "p95 seconds"
+        }
+      ],
+      "gridPos": {
+        "h": 8,
+        "w": 12,
+        "x": 12,
+        "y": 0
+      }
+    }
+  ]
+}

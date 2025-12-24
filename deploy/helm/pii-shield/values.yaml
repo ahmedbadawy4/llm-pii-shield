@@ -50,6 +50,12 @@ env:
   redactAssistant: "false"
   databasePath: "/app/data/audit.db"
 
+adminApiKey:
+  enabled: false
+  existingSecret: ""
+  keyName: "ADMIN_API_KEY"
+  value: "" # Demo-only; prefer existingSecret in production.
+
 ollama:
   enabled: true
   image:

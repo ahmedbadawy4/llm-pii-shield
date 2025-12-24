@@ -35,3 +35,23 @@ helm upgrade --install pii-shield ./pii-shield \
 ## Persistence
 - By default, a PVC is created and mounted at `/app/data` for the SQLite audit DB.
 - To re-use an existing claim: `--set persistence.existingClaim=my-claim`.
+
+## Admin API key (optional)
+Create a secret and reference it from values:
+```bash
+kubectl create secret generic pii-shield-admin \
+  --from-literal=ADMIN_API_KEY='your-secret'
+helm upgrade --install pii-shield ./pii-shield \
+  --set image.repository=YOUR_REPO/pii-shield \
+  --set adminApiKey.enabled=true \
+  --set adminApiKey.existingSecret=pii-shield-admin \
+  --set adminApiKey.keyName=ADMIN_API_KEY
+```
+
+For demos only, you can let the chart create the secret:
+```bash
+helm upgrade --install pii-shield ./pii-shield \
+  --set image.repository=YOUR_REPO/pii-shield \
+  --set adminApiKey.enabled=true \
+  --set adminApiKey.value='change-me'
+```

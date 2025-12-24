@@ -114,6 +114,10 @@
           <span>API base</span>
           <input id="baseUrl" type="text" value="" style="width: 190px; padding: 6px 8px; border-radius: 8px; border: 1px solid #e5e7eb; background: #f8fafc; color: var(--text); font-size: 12px;">
         </div>
+        <div class="tag">
+          <span>Admin key</span>
+          <input id="adminKey" type="text" value="" placeholder="X-Admin-Key" style="width: 160px; padding: 6px 8px; border-radius: 8px; border: 1px solid #e5e7eb; background: #f8fafc; color: var(--text); font-size: 12px;">
+        </div>
       </div>
       <div class="actions" style="margin-top: 10px;">
         <button class="secondary" id="tabChat">Chat</button>
@@ -329,10 +333,12 @@
 
     async function fetchStats() {
       const base = $("baseUrl").value.trim().replace(/\/$/, "");
+      const adminKey = $("adminKey").value.trim();
       if (!base) return;
       statsBox.textContent = "Loading...";
       try {
-        const res = await fetch(`${base}/admin/stats`);
+        const headers = adminKey ? { "X-Admin-Key": adminKey } : {};
+        const res = await fetch(`${base}/admin/stats`, { headers });
         const text = await res.text();
         const json = safeParse(text);
         statsBox.textContent = json ? JSON.stringify(json, null, 2) : text;
