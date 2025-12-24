@@ -1,12 +1,11 @@
 # PII Shield Helm Chart
 
-Quick-start for running the gateway on a local Kubernetes cluster with persistence and optional ingress/monitoring.
+Quick-start for running the gateway on a local Kubernetes cluster with persistence, Prometheus, and Grafana.
 
 ## Prerequisites
 - Kubernetes cluster (local kind/minikube/microk8s)
 - Helm 3
 - Container image available to the cluster (set `image.repository`/`tag` in `values.yaml`)
-- If using ServiceMonitor, Prometheus Operator must be installed.
 
 ## Install (basic, no ingress)
 ```bash
@@ -31,12 +30,8 @@ helm upgrade --install pii-shield ./pii-shield \
 make helm-urls
 ```
 
-## Prometheus scraping
-```bash
-helm upgrade --install pii-shield ./pii-shield \
-  --set image.repository=YOUR_REPO/pii-shield \
-  --set serviceMonitor.enabled=true
-```
+## Prometheus + Grafana
+Prometheus and Grafana are deployed by default in this chart. Grafana NodePort defaults to `http://localhost:30030` (login `admin` / `admin`).
 
 ## Persistence
 - By default, a PVC is created and mounted at `/app/data` for the SQLite audit DB.

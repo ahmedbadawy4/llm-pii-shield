@@ -14,3 +14,10 @@
 {{- define "pii-shield.chart" -}}
 {{- printf "%s-%s" .Chart.Name .Chart.Version | replace "+" "_" | trunc 63 | trimSuffix "-" -}}
 {{- end -}}
+
+{{- define "pii-shield.labels" -}}
+helm.sh/chart: {{ include "pii-shield.chart" . }}
+app.kubernetes.io/name: {{ include "pii-shield.name" . }}
+app.kubernetes.io/instance: {{ .Release.Name }}
+app.kubernetes.io/managed-by: {{ .Release.Service }}
+{{- end -}}

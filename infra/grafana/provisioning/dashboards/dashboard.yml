@@ -1,0 +1,11 @@
+apiVersion: 1
+
+providers:
+  - name: PII Shield
+    orgId: 1
+    folder: PII Shield
+    type: file
+    disableDeletion: true
+    editable: false
+    options:
+      path: /var/lib/grafana/dashboards
