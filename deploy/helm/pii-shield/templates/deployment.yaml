@@ -9,17 +9,20 @@ metadata:
     app.kubernetes.io/instance: {{ .Release.Name }}
     app.kubernetes.io/version: {{ .Chart.AppVersion }}
     app.kubernetes.io/managed-by: {{ .Release.Service }}
+    app.kubernetes.io/component: api
 spec:
   replicas: 1
   selector:
     matchLabels:
       app.kubernetes.io/name: {{ include "pii-shield.name" . }}
       app.kubernetes.io/instance: {{ .Release.Name }}
+      app.kubernetes.io/component: api
   template:
     metadata:
       labels:
         app.kubernetes.io/name: {{ include "pii-shield.name" . }}
         app.kubernetes.io/instance: {{ .Release.Name }}
+        app.kubernetes.io/component: api
       annotations:
         helm.sh/revision: "{{ .Release.Revision }}"
 {{- if .Values.podAnnotations }}
@@ -43,6 +46,8 @@ spec:
               value: {{ quote .Values.env.redactAssistant }}
             - name: DATABASE_PATH
               value: {{ quote .Values.env.databasePath }}
+            - name: SERVE_UI
+              value: "false"
 {{- if .Values.adminApiKey.enabled }}
             - name: ADMIN_API_KEY
               valueFrom:

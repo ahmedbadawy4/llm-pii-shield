@@ -12,6 +12,9 @@ from fastapi import FastAPI
 from fastapi import HTTPException
 from fastapi import Request
 from fastapi.staticfiles import StaticFiles
+import os
+
+from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
 from fastapi.responses import RedirectResponse
 from fastapi.responses import Response
@@ -60,6 +63,24 @@ def create_app(settings: Settings | None = None) -> FastAPI:
     provider_adapter = adapters.build_adapter(settings)
 
     app = FastAPI(title="LLM Privacy/PII Shield")
+    app.add_middleware(
+        CORSMiddleware,
+        allow_origins=[
+            "http://localhost:30081",
+            "http://127.0.0.1:30081",
+            "http://localhost:30080",
+            "http://127.0.0.1:30080",
+            "http://localhost:8080",
+            "http://127.0.0.1:8080",
+            "http://localhost:8000",
+            "http://127.0.0.1:8000",
+            "http://localhost:5173",
+            "http://127.0.0.1:5173",
+        ],
+        allow_credentials=True,
+        allow_methods=["*"],
+        allow_headers=["*"],
+    )
 
     @app.get("/healthz")
     async def healthz():
@@ -69,13 +90,19 @@ def create_app(settings: Settings | None = None) -> FastAPI:
     async def metrics():
         return Response(generate_latest(), media_type=CONTENT_TYPE_LATEST)
 
+    serve_ui = os.getenv("SERVE_UI", "false").strip().lower() in {"1", "true", "yes", "on"}
+    ui_dir = Path(__file__).resolve().parent.parent / "ui"
     static_dir = Path(__file__).resolve().parent.parent / "static"
-    if static_dir.exists():
-        app.mount("/ui", StaticFiles(directory=static_dir, html=True), name="ui")
+    if serve_ui:
+        if ui_dir.exists():
+            app.mount("/ui", StaticFiles(directory=ui_dir, html=True), name="ui")
+        elif static_dir.exists():
+            app.mount("/ui", StaticFiles(directory=static_dir, html=True), name="ui")
 
-        @app.get("/", include_in_schema=False)
-        async def root():
-            return RedirectResponse(url="/ui/")
+        if ui_dir.exists() or static_dir.exists():
+            @app.get("/", include_in_schema=False)
+            async def root():
+                return RedirectResponse(url="/ui/")
 
     @app.post("/v1/chat/completions")
     async def chat_completions(request: Request, body: ChatCompletionRequest):
