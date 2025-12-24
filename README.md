@@ -3,6 +3,20 @@ LLM Privacy/PII Shield
 
 FastAPI service that redacts PII from user prompts before proxying them to an Ollama model, with audit-friendly metadata logging and a lightweight stats endpoint.
 
+What this is
+------------
+PII redaction gateway/proxy for LLM calls with audit logging + metrics.
+
+Security defaults
+-----------------
+- Metadata-only audit logs (raw prompts/responses are not stored by default).
+- `/admin/stats` is protected by `X-Admin-Key` and disabled unless `ADMIN_API_KEY` is set.
+
+Limitations
+-----------
+- Regex-based PII detection baseline; false positives/negatives are expected.
+- Recommended upgrades: NER-based detector and domain-specific patterns for your data.
+
 Prerequisites
 -------------
 - Python 3.12
@@ -10,6 +24,8 @@ Prerequisites
 - Ollama running locally
 - Environment variable `OLLAMA_BASE_URL` pointing at your Ollama instance (defaults to `http://host.docker.internal:11434`)
 - Optional: `DATABASE_PATH` (defaults to `./data/audit.db`), `LOG_LEVEL` (defaults to `INFO`), `REDACT_ASSISTANT` (default `false`)
+- Admin: set `ADMIN_API_KEY` to enable `/admin/stats` access (header `X-Admin-Key`)
+- Provider: `LLM_PROVIDER=ollama` (default). `LLM_PROVIDER=azure_openai` is a stub for now. Optional placeholders: `AZURE_OPENAI_ENDPOINT`, `AZURE_OPENAI_DEPLOYMENT`
 
 Install Ollama locally
 ----------------------
@@ -39,6 +55,47 @@ docker run --rm \
 ```
 If your Ollama instance is on a different host/port, change `OLLAMA_BASE_URL` accordingly.
 
+Quickstart (Docker Compose)
+---------------------------
+Starts the API (and optionally Ollama) in one command:
+```bash
+docker compose up --build
+docker compose --profile ollama up --build
+```
+The API points to `http://host.docker.internal:11434` by default in `docker-compose.yml`. If you enable the `ollama` profile, set `OLLAMA_BASE_URL=http://ollama:11434`. The SQLite audit DB is created at `./data/audit.db` on first run.
+
+Example requests:
+```bash
+curl -i -X POST http://127.0.0.1:8000/v1/chat/completions \
+  -H "Content-Type: application/json" \
+  -d '{"model":"llama3.1:8b","messages":[{"role":"user","content":"My email is alice@example.com"}]}'
+
+curl -s http://127.0.0.1:8000/metrics
+
+curl -i http://127.0.0.1:8000/admin/stats \
+  -H "X-Admin-Key: ${ADMIN_API_KEY}"
+```
+Note: `/admin/stats` is disabled unless `ADMIN_API_KEY` is set.
+
+Make targets (local ops + Helm)
+-------------------------------
+Quick shortcuts are available in `Makefile`:
+```bash
+make run
+make test
+make docker-build
+make docker-run
+make helm-lint
+make helm-template
+make helm-install
+make helm-uninstall
+```
+Override defaults with env vars (examples):
+```bash
+make helm-install IMAGE_REPO=your-repo/pii-shield IMAGE_TAG=latest NAMESPACE=pii-shield
+make helm-template RELEASE=pii-shield NAMESPACE=pii-shield
+```
+
 Kubernetes (Helm, local)
 ------------------------
 Prereqs: Helm 3, local cluster (kind/minikube/microk8s), container image accessible to the cluster. Chart lives in `deploy/helm/pii-shield`.
@@ -65,6 +122,8 @@ Note: ingress is enabled by default in `values.yaml` with host `mizan-pii-shield
 Persistence: enabled by default via PVC mounted at `/app/data` (SQLite audit DB). Override `persistence.*` in `values.yaml` or set `persistence.existingClaim` to reuse a PVC.
 
 Prometheus: `/metrics` is exposed; enable ServiceMonitor via `--set serviceMonitor.enabled=true` if Prometheus Operator is installed.
+
+Admin API key (Helm): enable `adminApiKey.enabled=true`. Prefer `adminApiKey.existingSecret` + `adminApiKey.keyName` in production, or set `adminApiKey.value` for demos only.
 
 Ollama in-cluster (optional)
 ----------------------------
@@ -126,11 +185,18 @@ Admin stats endpoint
   - `pii_counts` (per type)
   - `recent_events` (up to `limit`, with request id/timestamp/model/latency/lengths/pii_types)
 - `limit` is clamped between 1 and 100.
-- **Security:** Designed for internal dashboards or debugging. Do not expose `/admin/stats` publicly without authentication or network restrictions, even though it only returns metadata.
+- **Security:** Secured by default. Access requires `ADMIN_API_KEY` and a matching `X-Admin-Key` header, so you can keep the endpoint enabled for dashboards without exposing it publicly.
+
+Threat model (short)
+--------------------
+- Protects against: accidental PII leakage to third-party LLMs, and PII leakage via logs/audit trails (prompts are never logged).
+- Does **not** claim perfect detection: regex redaction is best-effort and can miss edge cases or over-redact. For strict compliance, layer additional controls.
+- Short threat model doc: `docs/threat-model.md`.
 
 Simple UI
 ---------
 - A lightweight HTML console is available at `/ui` (served by the same FastAPI app) to send prompts, view responses/headers, and fetch `/admin/stats`.
+- Enter `ADMIN_API_KEY` in the UI to authorize stats fetches (sent as `X-Admin-Key`).
 - Static assets live in `static/index.html` and are copied into the Docker image.
 
 Running tests
@@ -151,6 +217,7 @@ Running tests
     python:3.12-slim \
     sh -c "pip install --no-cache-dir -r requirements.txt && pytest"
   ```
+CI runs `ruff check src tests` and `pytest` on pushes and PRs (see `.github/workflows/ci.yml`).
 
 Project layout
 --------------
@@ -166,10 +233,24 @@ Project layout
 Scope and positioning
 ---------------------
 - Regex-based, best-effort PII shielding; not a guarantee of full PII removal. For strict compliance, combine with additional safeguards and review.
-- Geared toward homelab/early-stage use; avoid exposing admin endpoints publicly without auth/network controls.
+- Production-minded but intentionally minimal: secured by default and easy to operate, while staying honest about best-effort redaction.
+- Regex is a baseline: false positives/negatives are expected; treat it as a gateway layer that can be upgraded with NER/PII detectors later.
+
+Observability
+-------------
+- Prometheus metrics at `/metrics`.
+- Example Grafana dashboard JSON lives at `deploy/grafana/pii-shield-dashboard.json`.
+
+Provider adapters
+-----------------
+- Default provider is Ollama; `LLM_PROVIDER=ollama` uses the current adapter.
+- A stub Azure OpenAI adapter is included (`LLM_PROVIDER=azure_openai`) to show the seam; it returns `501` until implemented.
+### Provider interface (how adapters plug in)
+- `src/clients/adapters.py` defines `ProviderAdapter` with `chat_completion(payload)`.
+- `build_adapter(settings)` selects the provider from `LLM_PROVIDER`.
+- Azure config is read from `AZURE_OPENAI_ENDPOINT` and `AZURE_OPENAI_DEPLOYMENT`.
 
 Future issues to track
 ----------------------
-- Add basic API key auth for `/admin/stats`.
 - Expand false-positive coverage for credit cards/addresses.
 - Iterate UI at `/ui` for better usability.

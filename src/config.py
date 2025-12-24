@@ -15,6 +15,10 @@ class Settings:
     database_path: Path
     log_level: str
     redact_assistant: bool
+    admin_api_key: str | None
+    llm_provider: str
+    azure_openai_endpoint: str | None
+    azure_openai_deployment: str | None
 
 
 def load_settings() -> Settings:
@@ -31,4 +35,8 @@ def load_settings() -> Settings:
         database_path=db_path,
         log_level=os.getenv("LOG_LEVEL", "INFO"),
         redact_assistant=_str_to_bool(os.getenv("REDACT_ASSISTANT"), False),
+        admin_api_key=os.getenv("ADMIN_API_KEY"),
+        llm_provider=os.getenv("LLM_PROVIDER", "ollama"),
+        azure_openai_endpoint=os.getenv("AZURE_OPENAI_ENDPOINT"),
+        azure_openai_deployment=os.getenv("AZURE_OPENAI_DEPLOYMENT"),
     )

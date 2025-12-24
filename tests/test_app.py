@@ -17,6 +17,10 @@ def _make_settings(db_path) -> config.Settings:
         database_path=db_path,
         log_level="INFO",
         redact_assistant=False,
+        admin_api_key="test-key",
+        llm_provider="ollama",
+        azure_openai_endpoint=None,
+        azure_openai_deployment=None,
     )
 
 
@@ -33,7 +37,7 @@ def client_with_stub(monkeypatch, tmp_path) -> Tuple[TestClient, Dict]:
         )
 
     monkeypatch.setattr(
-        app_module.ollama_client, "chat_completion", fake_chat_completion
+        app_module.adapters.ollama_client, "chat_completion", fake_chat_completion
     )
 
     settings = _make_settings(tmp_path / "audit.db")
@@ -101,7 +105,7 @@ def test_upstream_error_is_propagated(monkeypatch, tmp_path):
         )
 
     monkeypatch.setattr(
-        app_module.ollama_client, "chat_completion", failing_chat_completion
+        app_module.adapters.ollama_client, "chat_completion", failing_chat_completion
     )
     client = TestClient(app_module.create_app(_make_settings(tmp_path / "audit.db")))
 
@@ -126,7 +130,7 @@ def test_admin_stats_tracks_requests(monkeypatch, tmp_path):
         )
 
     monkeypatch.setattr(
-        app_module.ollama_client, "chat_completion", fake_chat_completion
+        app_module.adapters.ollama_client, "chat_completion", fake_chat_completion
     )
     client = TestClient(app_module.create_app(_make_settings(tmp_path / "audit.db")))
 
@@ -155,7 +159,7 @@ def test_admin_stats_tracks_requests(monkeypatch, tmp_path):
         },
     )
 
-    stats_resp = client.get("/admin/stats")
+    stats_resp = client.get("/admin/stats", headers={"X-Admin-Key": "test-key"})
 
     assert stats_resp.status_code == 200
     payload = stats_resp.json()

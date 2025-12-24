@@ -1,5 +1,6 @@
 import json
 import logging
+import secrets
 import time
 import uuid
 from datetime import datetime
@@ -20,7 +21,7 @@ from prometheus_client import Histogram
 from prometheus_client import generate_latest
 
 from . import storage
-from .clients import ollama as ollama_client
+from .clients import adapters
 from .config import Settings
 from .config import load_settings
 from .pii import redact_pii
@@ -56,6 +57,7 @@ def create_app(settings: Settings | None = None) -> FastAPI:
     settings = settings or load_settings()
     logger = setup_logger(settings.log_level)
     storage.init_db(settings.database_path)
+    provider_adapter = adapters.build_adapter(settings)
 
     app = FastAPI(title="LLM Privacy/PII Shield")
 
@@ -114,13 +116,14 @@ def create_app(settings: Settings | None = None) -> FastAPI:
 
         start = time.time()
         try:
-            upstream_resp = await ollama_client.chat_completion(
-                settings.ollama_base_url, payload
-            )
+            upstream_resp = await provider_adapter.chat_completion(payload)
+        except NotImplementedError as exc:
+            CHAT_REQUEST_COUNT.labels(status="error").inc()
+            raise HTTPException(status_code=501, detail=str(exc)) from exc
         except Exception as exc:
             CHAT_REQUEST_COUNT.labels(status="error").inc()
             raise HTTPException(
-                status_code=502, detail=f"Ollama unreachable: {exc}"
+                status_code=502, detail=f"Upstream unreachable: {exc}"
             ) from exc
         duration = time.time() - start
 
@@ -176,7 +179,17 @@ def create_app(settings: Settings | None = None) -> FastAPI:
         return response
 
     @app.get("/admin/stats")
-    async def admin_stats(limit: int = 20):
+    async def admin_stats(request: Request, limit: int = 20):
+        if not settings.admin_api_key:
+            raise HTTPException(
+                status_code=503,
+                detail="Admin stats disabled; set ADMIN_API_KEY to enable.",
+            )
+        provided_key = request.headers.get("X-Admin-Key")
+        if not provided_key or not secrets.compare_digest(
+            provided_key, settings.admin_api_key
+        ):
+            raise HTTPException(status_code=401, detail="Invalid admin key.")
         limited = max(1, min(limit, 100))
         return storage.fetch_stats(settings.database_path, limited)
 

@@ -43,6 +43,13 @@ spec:
               value: {{ quote .Values.env.redactAssistant }}
             - name: DATABASE_PATH
               value: {{ quote .Values.env.databasePath }}
+{{- if .Values.adminApiKey.enabled }}
+            - name: ADMIN_API_KEY
+              valueFrom:
+                secretKeyRef:
+                  name: {{ quote (default (printf "%s-admin" (include "pii-shield.fullname" .)) .Values.adminApiKey.existingSecret) }}
+                  key: {{ quote .Values.adminApiKey.keyName }}
+{{- end }}
           ports:
             - name: http
               containerPort: 8000
