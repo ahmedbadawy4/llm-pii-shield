@@ -10,6 +10,18 @@ service:
   port: 8000
   nodePort: 30080
 
+grafana:
+  enabled: true
+  service:
+    type: NodePort
+    port: 3000
+    nodePort: 30030
+
+prometheus:
+  enabled: true
+  service:
+    port: 9090
+
 ingress:
   enabled: false
   className: "nginx"
@@ -83,13 +95,6 @@ ollama:
   nodeSelector: {}
   tolerations: []
   affinity: {}
-
-serviceMonitor:
-  enabled: false
-  interval: 30s
-  scrapeTimeout: 10s
-  namespace: ""
-  additionalLabels: {}
 
 ui:
   enabled: false

@@ -39,6 +39,20 @@ CHAT_LATENCY = Histogram(
     "pii_shield_chat_latency_seconds",
     "Latency for chat completion requests in seconds",
 )
+REDACTED_REQUEST_COUNT = Counter(
+    "pii_shield_redacted_requests_total",
+    "Count of chat requests where any PII was redacted",
+)
+PII_REDACTION_COUNT = Counter(
+    "pii_shield_pii_redactions_total",
+    "Count of redaction events by PII type",
+    ["pii_type"],
+)
+REDACTION_RATIO = Histogram(
+    "pii_shield_redaction_ratio",
+    "Masked length divided by original length for redacted messages",
+    buckets=(0, 0.01, 0.05, 0.1, 0.2, 0.4, 0.6, 0.8, 1.0, 1.2, 1.5, 2.0, 3.0),
+)
 
 
 def setup_logger(log_level: str) -> logging.Logger:
@@ -140,6 +154,13 @@ def create_app(settings: Settings | None = None) -> FastAPI:
             normalized_messages.append(msg_dict)
 
         payload["messages"] = normalized_messages
+
+        if pii_types:
+            REDACTED_REQUEST_COUNT.inc()
+            for pii_type in pii_types:
+                PII_REDACTION_COUNT.labels(pii_type=pii_type).inc()
+        if original_len > 0:
+            REDACTION_RATIO.observe(masked_len / original_len)
 
         start = time.time()
         try:

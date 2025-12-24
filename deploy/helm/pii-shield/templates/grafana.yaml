@@ -1,0 +1,114 @@
+{{- if .Values.grafana.enabled }}
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: {{ include "pii-shield.fullname" . }}-grafana-datasources
+  labels:
+    {{- include "pii-shield.labels" . | nindent 4 }}
+    app.kubernetes.io/component: grafana
+  annotations:
+    checksum/config: '{{ .Files.Get "files/pii-shield.json" | sha256sum }}'
+data:
+  datasource.yml: |
+    apiVersion: 1
+    datasources:
+      - name: Prometheus
+        type: prometheus
+        access: proxy
+        url: http://{{ include "pii-shield.fullname" . }}-prometheus:9090
+        isDefault: true
+---
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: {{ include "pii-shield.fullname" . }}-grafana-dashboards
+  labels:
+    {{- include "pii-shield.labels" . | nindent 4 }}
+    app.kubernetes.io/component: grafana
+  annotations:
+    checksum/config: '{{ .Files.Get "files/pii-shield.json" | sha256sum }}'
+data:
+  dashboard.yml: |
+    apiVersion: 1
+    providers:
+      - name: PII Shield
+        orgId: 1
+        folder: PII Shield
+        type: file
+        disableDeletion: true
+        editable: false
+        options:
+          path: /var/lib/grafana/dashboards
+  pii-shield.json: |
+{{ .Files.Get "files/pii-shield.json" | indent 4 }}
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: {{ include "pii-shield.fullname" . }}-grafana
+  labels:
+    {{- include "pii-shield.labels" . | nindent 4 }}
+    app.kubernetes.io/component: grafana
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app.kubernetes.io/component: grafana
+      app.kubernetes.io/instance: {{ .Release.Name }}
+  template:
+    metadata:
+      labels:
+        app.kubernetes.io/component: grafana
+        app.kubernetes.io/instance: {{ .Release.Name }}
+    spec:
+      containers:
+        - name: grafana
+          image: grafana/grafana:10.3.1
+          ports:
+            - containerPort: 3000
+          env:
+            - name: GF_PATHS_PROVISIONING
+              value: /etc/grafana/provisioning
+          volumeMounts:
+            - name: datasources
+              mountPath: /etc/grafana/provisioning/datasources
+            - name: dashboards
+              mountPath: /etc/grafana/provisioning/dashboards
+            - name: dashboard-files
+              mountPath: /var/lib/grafana/dashboards
+      volumes:
+        - name: datasources
+          configMap:
+            name: {{ include "pii-shield.fullname" . }}-grafana-datasources
+        - name: dashboards
+          configMap:
+            name: {{ include "pii-shield.fullname" . }}-grafana-dashboards
+            items:
+              - key: dashboard.yml
+                path: dashboard.yml
+        - name: dashboard-files
+          configMap:
+            name: {{ include "pii-shield.fullname" . }}-grafana-dashboards
+            items:
+              - key: pii-shield.json
+                path: pii-shield.json
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: {{ include "pii-shield.fullname" . }}-grafana
+  labels:
+    {{- include "pii-shield.labels" . | nindent 4 }}
+    app.kubernetes.io/component: grafana
+spec:
+  type: {{ .Values.grafana.service.type }}
+  selector:
+    app.kubernetes.io/component: grafana
+    app.kubernetes.io/instance: {{ .Release.Name }}
+  ports:
+    - port: {{ .Values.grafana.service.port }}
+      targetPort: 3000
+      {{- if eq .Values.grafana.service.type "NodePort" }}
+      nodePort: {{ .Values.grafana.service.nodePort }}
+      {{- end }}
+{{- end }}

@@ -1,0 +1,7 @@
+global:
+  scrape_interval: 15s
+
+scrape_configs:
+  - job_name: "pii-shield"
+    static_configs:
+      - targets: ["pii-shield:8000"]

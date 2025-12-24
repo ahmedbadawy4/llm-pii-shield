@@ -64,7 +64,7 @@ Starts the API (and optionally Ollama) in one command:
 docker compose --profile ollama up --build  # recommended
 docker compose up --build
 ```
-The API points to `http://host.docker.internal:11434` by default in `docker-compose.yml`. If you enable the `ollama` profile, set `OLLAMA_BASE_URL=http://ollama:11434`. The SQLite audit DB is created at `./data/audit.db` on first run.
+Grafana runs at `http://localhost:3000` (login `admin` / `admin`) and Prometheus at `http://localhost:9090`. The API points to `http://host.docker.internal:11434` by default in `docker-compose.yml`. If you enable the `ollama` profile, set `OLLAMA_BASE_URL=http://ollama:11434`. The SQLite audit DB is created at `./data/audit.db` on first run.
 
 Example requests:
 ```bash
@@ -86,10 +86,13 @@ Quick shortcuts are available in `Makefile`:
 make run
 make test
 make docker-build
+make docker-up
+make docker-down
 make docker-run
 make helm-lint
 make helm-template
 make helm-install
+make helm-install-ollama-external
 make helm-uninstall
 ```
 Override defaults with env vars (examples):
@@ -130,7 +133,7 @@ Note: ingress is disabled by default in `values.yaml`. If you enable it, set `in
 
 Persistence: enabled by default via PVC mounted at `/app/data` (SQLite audit DB). Override `persistence.*` in `values.yaml` or set `persistence.existingClaim` to reuse a PVC.
 
-Prometheus: `/metrics` is exposed; enable ServiceMonitor via `--set serviceMonitor.enabled=true` if Prometheus Operator is installed.
+Prometheus: `/metrics` is exposed and scraped by the in-chart Prometheus deployment when using Helm.
 
 Admin API key (Helm): enable `adminApiKey.enabled=true`. Prefer `adminApiKey.existingSecret` + `adminApiKey.keyName` in production, or set `adminApiKey.value` for demos only.
 
@@ -253,7 +256,12 @@ Scope and positioning
 Observability
 -------------
 - Prometheus metrics at `/metrics`.
+- Metrics include request counts, latency, redacted request rate, per-type redactions, and redaction ratio.
 - Example Grafana dashboard JSON lives at `deploy/grafana/pii-shield-dashboard.json`.
+- `make helm-install` deploys Prometheus + Grafana in the same chart and provisions the dashboard into Grafana at `http://localhost:30030`.
+- Grafana default login is `admin` / `admin`.
+
+![Grafana dashboard](docs/images/grafana-dashboard.png)
 
 Provider adapters
 -----------------
