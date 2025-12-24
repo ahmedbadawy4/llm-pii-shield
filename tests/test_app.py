@@ -21,6 +21,7 @@ def _make_settings(db_path) -> config.Settings:
         llm_provider="ollama",
         azure_openai_endpoint=None,
         azure_openai_deployment=None,
+        allowed_models=None,
     )
 
 
@@ -94,6 +95,54 @@ def test_metrics_exposed(client_with_stub):
     assert metrics_resp.status_code == 200
     assert "pii_shield_chat_requests_total" in metrics_resp.text
     assert "pii_shield_chat_latency_seconds" in metrics_resp.text
+    assert "pii_shield_upstream_latency_seconds" in metrics_resp.text
+    assert "pii_shield_pii_redactions_total" in metrics_resp.text
+    assert "pii_shield_blocked_requests_total" in metrics_resp.text
+    assert "pii_shield_chat_errors_total" in metrics_resp.text
+
+
+def test_logs_do_not_include_raw_pii(client_with_stub, caplog):
+    client, _ = client_with_stub
+    caplog.set_level("INFO", logger="pii_shield")
+    body = {
+        "model": "llama3.1:8b",
+        "messages": [
+            {
+                "role": "user",
+                "content": "Email me at jane.doe@example.com and call (555) 123-4567",
+            }
+        ],
+    }
+
+    resp = client.post("/v1/chat/completions", json=body)
+
+    assert resp.status_code == 200
+    payload = resp.json()
+    assistant_content = ""
+    if isinstance(payload, dict):
+        message = payload.get("message", {})
+        if isinstance(message, dict):
+            assistant_content = message.get("content") or ""
+    assert "jane.doe@example.com" not in assistant_content
+    assert "(555) 123-4567" not in assistant_content
+    assert "jane.doe@example.com" not in caplog.text
+    assert "(555) 123-4567" not in caplog.text
+
+
+def test_policy_deny_blocks_request(tmp_path):
+    settings = _make_settings(tmp_path / "audit.db")
+    settings.allowed_models = ["llama3.1:8b"]
+    app = app_module.create_app(settings)
+    client = TestClient(app)
+    body = {
+        "model": "blocked-model",
+        "messages": [{"role": "user", "content": "Email me at a@b.com"}],
+    }
+
+    resp = client.post("/v1/chat/completions", json=body)
+
+    assert resp.status_code == 403
+    assert resp.json()["detail"] == "Model not allowed by policy."
 
 
 def test_upstream_error_is_propagated(monkeypatch, tmp_path):

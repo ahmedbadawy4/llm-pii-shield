@@ -19,6 +19,7 @@ class Settings:
     llm_provider: str
     azure_openai_endpoint: str | None
     azure_openai_deployment: str | None
+    allowed_models: list[str] | None
 
 
 def load_settings() -> Settings:
@@ -27,6 +28,14 @@ def load_settings() -> Settings:
     """
     db_path = Path(os.getenv("DATABASE_PATH", "./data/audit.db")).resolve()
     db_path.parent.mkdir(parents=True, exist_ok=True)
+
+    allowed_models = [
+        model.strip()
+        for model in os.getenv("ALLOWED_MODELS", "").split(",")
+        if model.strip()
+    ]
+    if not allowed_models:
+        allowed_models = None
 
     return Settings(
         ollama_base_url=os.getenv(
@@ -39,4 +48,5 @@ def load_settings() -> Settings:
         llm_provider=os.getenv("LLM_PROVIDER", "ollama"),
         azure_openai_endpoint=os.getenv("AZURE_OPENAI_ENDPOINT"),
         azure_openai_deployment=os.getenv("AZURE_OPENAI_DEPLOYMENT"),
+        allowed_models=allowed_models,
     )
