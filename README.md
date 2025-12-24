@@ -1,7 +1,9 @@
 LLM Privacy/PII Shield
 ======================
 
-FastAPI service that redacts PII from user prompts before proxying them to an Ollama model, with audit-friendly metadata logging and a lightweight stats endpoint.
+[![CI](https://github.com/ahmedbadawy4/llm-pii-shield/actions/workflows/ci.yml/badge.svg)](https://github.com/ahmedbadawy4/llm-pii-shield/actions/workflows/ci.yml)
+
+Production-grade LLM decision-support agent for SaaS vendor renewals. It ingests contracts, invoices, and usage exports, runs retrieval + tool-gated reasoning, and returns a renewal brief with citations, risk flags, negotiation plan, and draft outreach.
 
 What this is
 ------------
