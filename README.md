@@ -3,11 +3,52 @@ LLM Privacy/PII Shield
 
 [![CI](https://github.com/ahmedbadawy4/llm-pii-shield/actions/workflows/ci.yml/badge.svg)](https://github.com/ahmedbadawy4/llm-pii-shield/actions/workflows/ci.yml)
 
-Production-grade LLM decision-support agent for SaaS vendor renewals. It ingests contracts, invoices, and usage exports, runs retrieval + tool-gated reasoning, and returns a renewal brief with citations, risk flags, negotiation plan, and draft outreach.
+Production-grade LLM security gateway for PII redaction, policy gating, and observability across model traffic.
 
 What this is
 ------------
 PII redaction gateway/proxy for LLM calls with audit logging + metrics.
+
+Case Study (1 page)
+-------------------
+Problem
+LLM-enabled workflows often process contracts, invoices, tickets, and chat transcripts that contain emails, phone numbers, account identifiers, and billing details. Sending raw data to a model increases exposure risk and makes incident response and compliance harder.
+
+Threat model (prompt injection + data leakage)
+- Prompt injection: hostile or compromised documents try to override system intent, requesting exfiltration or policy bypass.
+- Data leakage: raw PII or sensitive account identifiers leak into model prompts, logs, or downstream responses.
+
+Architecture
+Clients send `/v1/chat/completions` to the shield, which redacts user messages, enforces policy, and forwards sanitized requests to the LLM provider. The gateway emits structured JSON logs, Prometheus metrics, and optional audit records in SQLite. Admin stats provide a lightweight operational view without storing prompts.
+
+Guardrails (redaction, allowlist, logging)
+- Redaction: regex-based PII masking on user messages, with optional assistant redaction.
+- Allowlist: optional `ALLOWED_MODELS` policy gate to prevent unknown or unapproved models.
+- Logging: metadata-only JSON logs with request IDs, redaction counts, and policy decisions (no raw prompts).
+
+Observability
+- `/metrics` exposes counters for redactions, blocked requests (if any), upstream latency, and errors.
+- Structured logs are consistent with Grafana/Prometheus dashboards and can be piped to SIEMs.
+Key metrics
+- `pii_shield_chat_requests_total` (status)
+- `pii_shield_redacted_requests_total`
+- `pii_shield_pii_redactions_total` (pii_type)
+- `pii_shield_blocked_requests_total` (policy)
+- `pii_shield_chat_errors_total` (error_type)
+- `pii_shield_chat_latency_seconds`, `pii_shield_upstream_latency_seconds`
+- `pii_shield_redaction_ratio`
+
+Deployment
+- Local dev, Docker, Docker Compose, and Helm are all first-class workflows.
+- Optional in-cluster Ollama deployment for a self-contained stack.
+
+Limitations / Next steps
+- Regex detection is a baseline; add NER and domain-specific patterns to reduce false positives/negatives.
+- Add streaming-safe redaction and richer policy engines (role-based controls, content-classification).
+- Expand threat coverage in `docs/threat-model.md` as new model or data sources are introduced.
+
+Why this matters in production
+Guardrails turn LLM integrations from a demo into something you can operate: you can prove what was redacted, enforce policy gates, and detect regressions before they become incidents. The same signals power audit trails, dashboards, and on-call alerts.
 
 Security defaults
 -----------------
@@ -25,7 +66,7 @@ Prerequisites
 - Docker (for containerized runs)
 - Ollama running locally
 - Environment variable `OLLAMA_BASE_URL` pointing at your Ollama instance (defaults to `http://host.docker.internal:11434`)
-- Optional: `DATABASE_PATH` (defaults to `./data/audit.db`), `LOG_LEVEL` (defaults to `INFO`), `REDACT_ASSISTANT` (default `false`)
+- Optional: `DATABASE_PATH` (defaults to `./data/audit.db`), `LOG_LEVEL` (defaults to `INFO`), `REDACT_ASSISTANT` (default `false`), `ALLOWED_MODELS` (comma-separated)
 - Admin: set `ADMIN_API_KEY` to enable `/admin/stats` access (header `X-Admin-Key`)
 - Provider: `LLM_PROVIDER=ollama` (default). `LLM_PROVIDER=azure_openai` is a stub for now. Optional placeholders: `AZURE_OPENAI_ENDPOINT`, `AZURE_OPENAI_DEPLOYMENT`
 
@@ -186,7 +227,7 @@ Note: user PII is masked before forwarding, so the `messages` sent to Ollama con
 
 Structured logging and audit storage
 ------------------------------------
-- Each request writes a JSON log line with: `event`, `id`, `timestamp`, `pii_types`, `model`, `latency`, `original_length`, `masked_length`, `client_ip`.
+- Each request writes a JSON log line with: `event`, `request_id`, `redaction_count`, `policy_decisions`, `timestamp`, `pii_types`, `model`, `latency`, `original_length`, `masked_length`, `client_ip`.
 - Prompts/responses are **not** logged in this mode—only metadata.
 - Metadata is also persisted to a local SQLite database at `DATABASE_PATH` for basic auditing and reporting.
 

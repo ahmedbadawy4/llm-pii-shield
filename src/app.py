@@ -39,6 +39,10 @@ CHAT_LATENCY = Histogram(
     "pii_shield_chat_latency_seconds",
     "Latency for chat completion requests in seconds",
 )
+UPSTREAM_LATENCY = Histogram(
+    "pii_shield_upstream_latency_seconds",
+    "Latency for upstream model calls in seconds",
+)
 REDACTED_REQUEST_COUNT = Counter(
     "pii_shield_redacted_requests_total",
     "Count of chat requests where any PII was redacted",
@@ -47,6 +51,16 @@ PII_REDACTION_COUNT = Counter(
     "pii_shield_pii_redactions_total",
     "Count of redaction events by PII type",
     ["pii_type"],
+)
+BLOCKED_REQUEST_COUNT = Counter(
+    "pii_shield_blocked_requests_total",
+    "Count of requests blocked by policy",
+    ["policy"],
+)
+ERROR_COUNT = Counter(
+    "pii_shield_chat_errors_total",
+    "Count of chat completion errors by type",
+    ["error_type"],
 )
 REDACTION_RATIO = Histogram(
     "pii_shield_redaction_ratio",
@@ -162,13 +176,53 @@ def create_app(settings: Settings | None = None) -> FastAPI:
         if original_len > 0:
             REDACTION_RATIO.observe(masked_len / original_len)
 
+        policy_decisions = []
+        requested_model = (payload.get("model") or "").strip()
+        if settings.allowed_models:
+            if requested_model not in settings.allowed_models:
+                BLOCKED_REQUEST_COUNT.labels(policy="model_allowlist").inc()
+                ERROR_COUNT.labels(error_type="policy_denied").inc()
+                CHAT_REQUEST_COUNT.labels(status="blocked").inc()
+                policy_decisions.append(
+                    {
+                        "decision": "deny",
+                        "policy": "model_allowlist",
+                        "reason": "model_not_allowed",
+                    }
+                )
+                log_metadata(
+                    logger,
+                    {
+                        "event": "request.blocked",
+                        "request_id": req_id,
+                        "redaction_count": len(pii_types),
+                        "policy_decisions": policy_decisions,
+                        "timestamp": datetime.now(timezone.utc).isoformat(),
+                        "model": requested_model,
+                        "pii_types": sorted(pii_types),
+                        "original_length": original_len,
+                        "masked_length": masked_len,
+                        "client_ip": request.client.host if request.client else None,
+                    },
+                )
+                raise HTTPException(
+                    status_code=403, detail="Model not allowed by policy."
+                )
+            policy_decisions.append(
+                {"decision": "allow", "policy": "model_allowlist"}
+            )
+        else:
+            policy_decisions.append({"decision": "allow", "policy": "none"})
+
         start = time.time()
         try:
             upstream_resp = await provider_adapter.chat_completion(payload)
         except NotImplementedError as exc:
+            ERROR_COUNT.labels(error_type="not_implemented").inc()
             CHAT_REQUEST_COUNT.labels(status="error").inc()
             raise HTTPException(status_code=501, detail=str(exc)) from exc
         except Exception as exc:
+            ERROR_COUNT.labels(error_type="upstream_unreachable").inc()
             CHAT_REQUEST_COUNT.labels(status="error").inc()
             raise HTTPException(
                 status_code=502, detail=f"Upstream unreachable: {exc}"
@@ -176,6 +230,7 @@ def create_app(settings: Settings | None = None) -> FastAPI:
         duration = time.time() - start
 
         if upstream_resp.status_code != 200:
+            ERROR_COUNT.labels(error_type="upstream_error").inc()
             CHAT_REQUEST_COUNT.labels(status="error").inc()
             raise HTTPException(
                 status_code=upstream_resp.status_code,
@@ -185,6 +240,7 @@ def create_app(settings: Settings | None = None) -> FastAPI:
         try:
             upstream_json = upstream_resp.json()
         except ValueError as exc:
+            ERROR_COUNT.labels(error_type="invalid_upstream_json").inc()
             CHAT_REQUEST_COUNT.labels(status="error").inc()
             raise HTTPException(
                 status_code=502,
@@ -192,6 +248,7 @@ def create_app(settings: Settings | None = None) -> FastAPI:
             ) from exc
 
         CHAT_LATENCY.observe(duration)
+        UPSTREAM_LATENCY.observe(duration)
         CHAT_REQUEST_COUNT.labels(status="success").inc()
 
         pii_list = sorted(pii_types)
@@ -220,6 +277,9 @@ def create_app(settings: Settings | None = None) -> FastAPI:
             logger,
             {
                 "event": "request.completed",
+                "request_id": req_id,
+                "redaction_count": len(pii_list),
+                "policy_decisions": policy_decisions,
                 **audit_payload,
             },
         )

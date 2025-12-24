@@ -1,30 +1,31 @@
-# Threat Model (Short)
+# Threat Model
 
-This project is a best-effort PII gateway. It reduces risk but does not eliminate it.
+This project assumes the LLM is untrusted with raw customer data. The shield reduces risk by redacting PII, enforcing minimal policy gates, and emitting audit-safe signals for monitoring.
 
-## Assets
-- Prompts and model outputs (may contain PII).
-- Redacted PII metadata and audit logs.
-- Admin endpoint and admin API key.
-- Service availability and configuration.
+Attack scenarios and mitigations
+--------------------------------
+1) Prompt injection via documents or user input
+- Scenario: A contract or invoice includes instructions to disclose secrets or bypass rules.
+- Mitigation: Only user messages are sent after redaction; keep system prompts immutable outside the user payload; restrict model usage with allowlists; monitor for anomalies in request metadata.
 
-## Threats
-- Prompt leakage to upstream LLM if redaction misses patterns.
-- Log leakage or unintended retention of sensitive metadata.
-- Header spoofing to access `/admin/stats`.
-- Injection/bypass attempts via obfuscated PII or non-user roles.
-- SSRF/egress abuse by proxying to untrusted endpoints.
-- Sensitive data retention in local volumes/backups.
+2) PII leakage into prompts, logs, or downstream systems
+- Scenario: Emails, phone numbers, or identifiers leak into LLM prompts or audit logs.
+- Mitigation: Regex-based redaction before forwarding; metadata-only logging; audit DB stores types and lengths only.
 
-## Mitigations
-- Redaction on user content before proxying; keep patterns updated.
-- Metadata-only logging by default; secure logs/DB at rest.
-- Admin stats protected by `ADMIN_API_KEY` and `X-Admin-Key`.
-- Least-privilege runtime, rate limiting (recommended), and TLS.
-- Network egress controls on the proxy target (recommended).
-- Secret management via Kubernetes Secrets or env injection (not plaintext in charts).
+3) Unauthorized model usage
+- Scenario: Requests route to unapproved models or endpoints.
+- Mitigation: Optional `ALLOWED_MODELS` policy gate; environment-controlled provider configuration.
 
-## Non-goals
-- Perfect PII detection or compliance guarantees.
-- Defending against a fully compromised host or cluster.
-- Preventing all misuse of upstream model behavior.
+4) Upstream provider instability or errors
+- Scenario: High latency or errors cause retries that leak data or mask failures.
+- Mitigation: Prometheus metrics for latency and errors; structured logs with request IDs for tracing; alert on error rate and p99 latency.
+
+5) Abuse of admin endpoints
+- Scenario: `GET /admin/stats` is exposed publicly.
+- Mitigation: Disabled unless `ADMIN_API_KEY` is set; constant-time key comparison; keep endpoint behind internal networking in production.
+
+Notes and assumptions
+---------------------
+- Regex-based detection is a baseline; expect false positives/negatives.
+- The shield does not yet classify or block content beyond the allowlist policy.
+- Responses from the upstream model are returned as-is; downstream services should apply additional safety controls if needed.
