@@ -59,8 +59,8 @@ Quickstart (Docker Compose)
 ---------------------------
 Starts the API (and optionally Ollama) in one command:
 ```bash
+docker compose --profile ollama up --build  # recommended
 docker compose up --build
-docker compose --profile ollama up --build
 ```
 The API points to `http://host.docker.internal:11434` by default in `docker-compose.yml`. If you enable the `ollama` profile, set `OLLAMA_BASE_URL=http://ollama:11434`. The SQLite audit DB is created at `./data/audit.db` on first run.
 
@@ -198,6 +198,8 @@ Simple UI
 - A lightweight HTML console is available at `/ui` (served by the same FastAPI app) to send prompts, view responses/headers, and fetch `/admin/stats`.
 - Enter `ADMIN_API_KEY` in the UI to authorize stats fetches (sent as `X-Admin-Key`).
 - Static assets live in `static/index.html` and are copied into the Docker image.
+
+![UI screenshot](docs/images/ui-screenshot.png)
 
 Running tests
 -------------
