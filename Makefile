@@ -32,6 +32,7 @@ help:
 	@printf "%s\n" "  docker-up        Start Docker Compose stack"
 	@printf "%s\n" "  docker-down      Stop Docker Compose stack"
 	@printf "%s\n" "  docker-run       Run the Docker image locally"
+	@printf "%s\n" "  cleanup          Uninstall Helm release, stop Compose, remove data"
 
 .PHONY: helm-lint
 helm-lint:
@@ -121,3 +122,9 @@ docker-run:
 		-e OLLAMA_BASE_URL="http://host.docker.internal:11434" \
 		--add-host=host.docker.internal:host-gateway \
 		$(APP_NAME):$(IMAGE_TAG)
+
+.PHONY: cleanup
+cleanup:
+	$(MAKE) helm-uninstall
+	$(DOCKER_COMPOSE) down -v
+	rm -rf data
