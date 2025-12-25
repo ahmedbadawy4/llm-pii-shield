@@ -130,6 +130,7 @@ make docker-build
 make docker-up
 make docker-down
 make docker-run
+make cleanup
 make helm-lint
 make helm-template
 make helm-install
@@ -140,6 +141,17 @@ Override defaults with env vars (examples):
 ```bash
 make helm-install IMAGE_REPO=your-repo/pii-shield IMAGE_TAG=latest NAMESPACE=pii-shield
 make helm-template RELEASE=pii-shield NAMESPACE=pii-shield
+```
+
+Cleanup
+-------
+```bash
+make cleanup
+
+# or run the steps manually
+make helm-uninstall
+docker compose down -v
+rm -rf data
 ```
 
 Kubernetes (Helm, local)
